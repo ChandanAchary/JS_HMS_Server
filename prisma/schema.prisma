@@ -1,0 +1,496 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============== SYSTEM CONFIG ==============
+// Tracks system-wide configuration like setup completion
+// Only ONE record should exist
+model SystemConfig {
+  id        String   @id @default("system_config")
+  
+  // Setup tracking
+  isSetupComplete   Boolean  @default(false)
+  setupCompletedAt  DateTime?
+  setupCompletedBy  String?  // Admin ID who completed setup
+  
+  // System info
+  systemVersion     String   @default("1.0.0")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("system_config")
+}
+
+// ============== ADMIN INVITE ==============
+// Tracks invitations for new admins
+model AdminInvite {
+  id          String   @id @default(cuid())
+  
+  // Invite details
+  email       String   @unique
+  token       String   @unique
+  role        String   @default("ADMIN") // SUPER_ADMIN, ADMIN
+  
+  // Inviter info
+  invitedBy   String   // Admin ID who sent invite
+  inviterName String   // Name for email display
+  
+  // Hospital association
+  hospitalId  String
+  
+  // Expiry and status
+  expiresAt   DateTime
+  usedAt      DateTime?
+  isUsed      Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([token])
+  @@index([email])
+  @@map("admin_invites")
+}
+
+// ============== TENANT LAYER (Hospital / Organization Services) ==============
+// This schema contains only tenant-specific models
+// Platform models (Tenant config, Subscription, Invoice, PlatformAdmin, etc.) are in platform schema
+
+// ============== HOSPITAL (SINGLE TENANT) ==============
+// Single-tenant model - One hospital per application instance
+// Only one record should exist in this table
+model Hospital {
+  id           String  @id @default(cuid())
+  hospitalName String
+  
+  // Single tenant configuration (no subdomain/domain system)
+  address   String
+  latitude  Float  @default(0)
+  longitude Float  @default(0)
+
+  // Hospital profile fields
+  logo               String @default("") // Path to hospital logo
+  registrationType   String @default("") // e.g., "Clinic", "Hospital", "Diagnostic Center"
+  registrationNumber String @default("") // Hospital registration number
+  city               String @default("")
+  state              String @default("")
+  country            String @default("")
+  contactEmail       String @default("")
+  contactPhone       String @default("")
+
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  admins             Admin[]
+  employees          Employee[]
+  doctors            Doctor[]
+  patients           Patient[]
+  attendance         Attendance[]
+  assignments        Assignment[]
+  bills              Bill[]
+  payrolls           Payroll[]
+  joinRequests       JoinRequest[]
+  registrationTokens RegistrationToken[]
+  formTemplates      FormTemplate[]      @relation("HospitalFormTemplates")
+
+  @@map("hospitals")
+}
+
+// ============== ADMIN (System/Tenant Admin) ==============
+model Admin {
+  id           String @id @default(cuid())
+  name         String
+  email        String @unique
+  phone        String @unique
+  password     String
+  profilePhoto String @default("")
+  role         String @default("ADMIN")
+
+  // Admin profile fields
+  designation String @default("") // Optional designation
+  address     String @default("") // Optional address
+
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  isOwner                    Boolean   @default(false)
+  emailVerified              Boolean   @default(false)
+  emailVerificationToken     String?
+  emailVerificationExpiresAt DateTime?
+
+  // OTP-based email verification (6-digit code)
+  emailVerificationOTP       String?   // Hashed OTP
+  emailVerificationOTPExpiry DateTime? // OTP expiry time
+
+  // Registration status (for multi-step flow)
+  registrationStep String @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, VERIFIED, HOSPITAL_PENDING, COMPLETE
+
+  // Password reset fields
+  passwordResetToken     String?
+  passwordResetExpiresAt DateTime?
+  passwordResetOTP       String?
+  passwordResetOTPExpiry DateTime?
+
+  // First login password change
+  isPasswordChanged Boolean @default(false)
+
+  // Change-password (logged-in) OTP & pending new password
+  changePasswordOTP       String?
+  changePasswordOTPExpiry DateTime?
+  changePasswordNewHash   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  assignments Assignment[] // back-relation for Assignment.Admin
+
+  @@index([email])
+  @@index([phone])
+  @@map("admins")
+}
+
+// ============== EMPLOYEE ==============
+model Employee {
+  id    String @id @default(cuid())
+  name  String
+  email String
+  phone String
+
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  qualification String?
+  role          String // e.g., RECEPTIONIST, NURSE, LAB_TECHNICIAN, etc.
+  profilePic    String?
+  salary        Float   @default(0)
+
+  accountNumber String?
+  ifscCode      String?
+
+  paymentStatus String @default("PAY") // PAY or PAID
+  lastPaidMonth Int?
+  lastPaidYear  Int?
+
+  password String
+
+  // Password reset fields
+  passwordResetToken     String?
+  passwordResetExpiresAt DateTime?
+  passwordResetOTP       String?
+  passwordResetOTPExpiry DateTime?
+
+  // First login password change
+  isPasswordChanged Boolean @default(false) // false until user updates password after first login
+
+  // Change-password (logged-in) OTP & pending new password
+  changePasswordOTP       String?
+  changePasswordOTPExpiry DateTime?
+  changePasswordNewHash   String?
+
+  status                String  @default("APPROVED") // PENDING, APPROVED, REJECTED
+  isActive              Boolean @default(true)
+  approvedBy            String?
+  defaultPasswordIssued Boolean @default(false)
+
+  isDeleted   Boolean   @default(false)
+  deletedAt   DateTime?
+  isLoggedIn  Boolean   @default(false)
+  lastLoginAt DateTime?
+
+  delegatedPermissions String[] @default([])
+
+  // Email verification
+  emailVerified              Boolean   @default(false)
+  emailVerificationToken     String?
+  emailVerificationExpiresAt DateTime?
+  emailVerificationUsed      Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  attendance            Attendance[] @relation("EmployeeAttendance")
+  assignmentsAsAssignee Assignment[] @relation("EmployeeAssignments")
+  bills                 Bill[]
+  payrolls              Payroll[]    @relation("EmployeePayroll")
+
+  @@unique([email, isDeleted])
+  @@unique([phone, isDeleted])
+  @@index([hospitalId])
+  @@map("employees")
+}
+
+// ============== DOCTOR ==============
+model Doctor {
+  id    String @id @default(cuid())
+  name  String
+  email String
+  phone String
+
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  specialization String // CARDIOLOGY, NEUROLOGY, etc.
+  profilePic     String?
+  salary         Float   @default(0)
+
+  accountNumber String?
+  ifscCode      String?
+
+  paymentStatus String @default("PAY") // PAY or PAID
+  lastPaidMonth Int?
+  lastPaidYear  Int?
+
+  password String
+
+  // Password reset fields
+  passwordResetToken     String?
+  passwordResetExpiresAt DateTime?
+  passwordResetOTP       String?
+  passwordResetOTPExpiry DateTime?
+
+  // First login password change
+  isPasswordChanged Boolean @default(false) // false until user updates password after first login
+
+  // Change-password (logged-in) OTP & pending new password
+  changePasswordOTP       String?
+  changePasswordOTPExpiry DateTime?
+  changePasswordNewHash   String?
+
+  status                String  @default("APPROVED") // PENDING, APPROVED, REJECTED
+  isActive              Boolean @default(true)
+  approvedBy            String?
+  defaultPasswordIssued Boolean @default(false)
+
+  isDeleted   Boolean   @default(false)
+  deletedAt   DateTime?
+  isLoggedIn  Boolean   @default(false)
+  lastLoginAt DateTime?
+
+  delegatedPermissions String[] @default([])
+
+  // Email verification
+  emailVerified              Boolean   @default(false)
+  emailVerificationToken     String?
+  emailVerificationExpiresAt DateTime?
+  emailVerificationUsed      Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  attendance            Attendance[] @relation("DoctorAttendance")
+  assignmentsAsAssignee Assignment[] @relation("DoctorAssignments")
+  payrolls              Payroll[]    @relation("DoctorPayroll")
+
+  @@unique([email, isDeleted])
+  @@unique([phone, isDeleted])
+  @@index([hospitalId])
+  @@map("doctors")
+}
+
+// ============== PATIENT ==============
+model Patient {
+  id        String @id @default(cuid())
+  patientId String @unique
+
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  name    String
+  age     Int?
+  gender  String @default("Other") // Male, Female, Other
+  phone   String @unique
+  address String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  bills Bill[]
+
+  @@index([hospitalId])
+  @@index([patientId])
+  @@map("patients")
+}
+
+// ============== ATTENDANCE ==============
+model Attendance {
+  id         Int       @id @default(autoincrement())
+  // either employeeId OR doctorId will be set for a given attendance row
+  employeeId String?
+  Employee   Employee? @relation("EmployeeAttendance", fields: [employeeId], references: [id])
+  doctorId   String?
+  Doctor     Doctor?   @relation("DoctorAttendance", fields: [doctorId], references: [id])
+
+  userId     String? // optional polymorphic id (kept for legacy)
+  role       String // "DOCTOR" | "EMPLOYEE"
+  date       String
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  checkInTime         DateTime?
+  checkOutTime        DateTime?
+  totalWorkingMinutes Int                 @default(0)
+  attendanceUnit      Int                 @default(0)
+  sessions            AttendanceSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("attendances")
+}
+
+model AttendanceSession {
+  id              Int        @id @default(autoincrement())
+  attendanceId    Int
+  checkInTime     DateTime
+  checkOutTime    DateTime?
+  durationMinutes Int?
+  checkInLat      Float? // added
+  checkInLng      Float? // added
+  checkInSelfie   String? // added
+  checkOutLat     Float?
+  checkOutLng     Float?
+  checkOutSelfie  String?
+  attendance      Attendance @relation(fields: [attendanceId], references: [id])
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@map("attendance_sessions")
+}
+
+// ============== ASSIGNMENT ============== [Would be done by the admin]
+model Assignment {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+  adminId     String?
+  Admin       Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  // assignee can be Employee or Doctor; store both nullable fields and relation names referenced by Employee/Doctor
+  employeeId String?
+  Employee   Employee? @relation("EmployeeAssignments", fields: [employeeId], references: [id])
+  doctorId   String?
+  Doctor     Doctor?   @relation("DoctorAssignments", fields: [doctorId], references: [id])
+
+  hospitalId String
+  Hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("assignments")
+}
+
+// ============== BILL ==============
+model Bill {
+  id         String    @id @default(cuid())
+  amount     Float
+  hospitalId String
+  Hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  Employee   Employee? @relation(fields: [employeeId], references: [id])
+  employeeId String?
+  Patient    Patient?  @relation(fields: [patientId], references: [id])
+  patientId  String?
+
+  @@map("bills")
+}
+
+// ============== PAYROLL ==============
+model Payroll {
+  id         String    @id @default(cuid())
+  hospitalId String
+  Hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  // payroll can be for employee or doctor
+  employeeId String?
+  Employee   Employee? @relation("EmployeePayroll", fields: [employeeId], references: [id])
+  doctorId   String?
+  Doctor     Doctor?   @relation("DoctorPayroll", fields: [doctorId], references: [id])
+
+  amount Float
+  month  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payrolls")
+}
+
+// ============== JOIN REQUEST ==============
+model JoinRequest {
+  id         String   @id @default(cuid())
+  hospitalId String
+  Hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  // Applicant info
+  name           String
+  email          String
+  phone          String?
+  role           String // DOCTOR or EMPLOYEE
+  appliedRole    String? // Specific role applied for (e.g., "Nurse", "Pediatrician")
+  specialization String? // For doctors
+  age            Int?
+  dob            DateTime?
+  qualifications Json? // Array of qualifications
+  licenseNumber  String? // Medical license for doctors
+  profilePic     String? // Path to uploaded profile picture
+  formData       Json? // Additional form data
+
+  // Status tracking
+  status          String    @default("PENDING") // PENDING, FORM_SUBMITTED, APPROVED, REJECTED
+  rejectionReason String? // Reason for rejection
+  approvedBy      String? // Admin ID who approved
+  approvedAt      DateTime?
+  createdUserId   String? // ID of created user (after approval)
+
+  // Audit
+  submittedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([hospitalId])
+  @@index([status])
+  @@index([email])
+}
+
+// ============== REGISTRATION TOKEN ==============
+model RegistrationToken {
+  id         String    @id @default(cuid())
+  token      String    @unique
+  role       String
+  metadata   Json?
+  used       Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  Hospital   Hospital? @relation(fields: [hospitalId], references: [id])
+  hospitalId String?
+
+  @@map("registration_tokens")
+}
+
+// ============== FORM TEMPLATE ==============
+model FormTemplate {
+  id         String    @id @default(cuid())
+  name       String
+  type       String // <-- add this
+  hospitalId String?
+  Hospital   Hospital? @relation("HospitalFormTemplates", fields: [hospitalId], references: [id], onDelete: SetNull)
+  schema     Json
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([hospitalId, type], name: "hospitalId_type") // <-- composite unique used by findUnique
+  @@map("form_templates")
+}
