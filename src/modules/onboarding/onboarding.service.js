@@ -355,7 +355,7 @@ export class OnboardingService {
           specialization: joinRequest.specialization || joinRequest.appliedRole || '',
           profilePic: joinRequest.profilePic || '',
           password: hashedPassword,
-          status: 'APPROVED',
+          status: 'ACTIVE',
           isActive: true,
           approvedBy: adminId,
           defaultPasswordIssued: true
@@ -393,7 +393,7 @@ export class OnboardingService {
         qualification: joinRequest.qualifications?.length ? joinRequest.qualifications[0] : '',
         profilePic: joinRequest.profilePic || '',
         password: hashedPassword,
-        status: 'APPROVED',
+        status: 'ACTIVE',
         isActive: true,
         approvedBy: adminId,
         defaultPasswordIssued: true

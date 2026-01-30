@@ -49,6 +49,12 @@ export const submitApplication = async (req, res, next) => {
   try {
     const { role } = req.params;
 
+    console.log('[PublicRegistration] Received application:', {
+      role,
+      bodyFields: Object.keys(req.body),
+      hasFile: !!req.file
+    });
+
     const service = new PublicRegistrationService(req.prisma);
     const joinRequest = await service.submitApplicationSingleTenant(
       role,
@@ -63,6 +69,11 @@ export const submitApplication = async (req, res, next) => {
       )
     );
   } catch (error) {
+    console.error('[PublicRegistration] Error:', {
+      message: error.message,
+      details: error.details || error.metadata || {},
+      stack: error.stack?.split('\n').slice(0, 3).join('\n')
+    });
     next(error);
   }
 };

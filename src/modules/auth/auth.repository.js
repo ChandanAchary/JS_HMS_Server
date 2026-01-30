@@ -5,6 +5,7 @@
 
 import logger from '../../core/utils/logger.js';
 import { DatabaseError } from '../../shared/exceptions/AppError.js';
+import { getPermissionsForRole } from '../../rbac/rolePermissions.js';
 
 export class AuthRepository {
   constructor(prisma) {
@@ -17,22 +18,31 @@ export class AuthRepository {
   async findUserByEmailOrPhone(emailOrPhone) {
     try {
       // Try to find admin
-      const admin = await this.prisma.admin.findUnique({
-        where: { email: emailOrPhone.toLowerCase() },
+      const admin = await this.prisma.admin.findFirst({
+        where: { 
+          email: emailOrPhone.toLowerCase(),
+          isDeleted: false
+        },
       }).catch(() => null);
 
       if (admin) return { ...admin, userType: 'ADMIN' };
 
       // Try to find employee
-      const employee = await this.prisma.employee.findUnique({
-        where: { email: emailOrPhone.toLowerCase() },
+      const employee = await this.prisma.employee.findFirst({
+        where: { 
+          email: emailOrPhone.toLowerCase(),
+          isDeleted: false
+        },
       }).catch(() => null);
 
       if (employee) return { ...employee, userType: 'EMPLOYEE' };
 
       // Try to find doctor
-      const doctor = await this.prisma.doctor.findUnique({
-        where: { email: emailOrPhone.toLowerCase() },
+      const doctor = await this.prisma.doctor.findFirst({
+        where: { 
+          email: emailOrPhone.toLowerCase(),
+          isDeleted: false
+        },
       }).catch(() => null);
 
       if (doctor) return { ...doctor, userType: 'DOCTOR' };
@@ -40,14 +50,20 @@ export class AuthRepository {
       // Try phone number
       const cleanPhone = emailOrPhone.replace(/\D/g, '');
 
-      const empByPhone = await this.prisma.employee.findUnique({
-        where: { phone: cleanPhone },
+      const empByPhone = await this.prisma.employee.findFirst({
+        where: { 
+          phone: cleanPhone,
+          isDeleted: false
+        },
       }).catch(() => null);
 
       if (empByPhone) return { ...empByPhone, userType: 'EMPLOYEE' };
 
-      const docByPhone = await this.prisma.doctor.findUnique({
-        where: { phone: cleanPhone },
+      const docByPhone = await this.prisma.doctor.findFirst({
+        where: { 
+          phone: cleanPhone,
+          isDeleted: false
+        },
       }).catch(() => null);
 
       if (docByPhone) return { ...docByPhone, userType: 'DOCTOR' };
@@ -67,8 +83,11 @@ export class AuthRepository {
       const model = this.getModelByUserType(userType);
       if (!model) return null;
 
-      return await model.findUnique({
-        where: { email: email.toLowerCase() },
+      return await model.findFirst({
+        where: { 
+          email: email.toLowerCase(),
+          isDeleted: false
+        },
       });
     } catch (error) {
       logger.error(`Error finding ${userType}:`, error);
@@ -108,23 +127,15 @@ export class AuthRepository {
 
   /**
    * Get user permissions by role
-   * Returns empty array if role not found or permissions unavailable
+   * Uses static RBAC mapping from rolePermissions.js
    */
   async getUserPermissions(role) {
     try {
-      if (!this.prisma || !this.prisma.role) {
-        logger.warn('Prisma role table not available, returning empty permissions');
-        return [];
-      }
-
-      const roleData = await this.prisma.role.findUnique({
-        where: { name: role },
-        include: { permissions: true },
-      }).catch(() => null);
-
-      return roleData?.permissions?.map(p => p.name) || [];
+      // Use static RBAC mapping instead of database query
+      const permissions = getPermissionsForRole(role);
+      return permissions || [];
     } catch (error) {
-      logger.warn(`Permissions unavailable for role ${role}, returning empty array`);
+      logger.warn(`Error getting permissions for role ${role}, returning empty array`);
       return [];
     }
   }

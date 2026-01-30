@@ -34,9 +34,9 @@ async function startServer() {
 ╔════════════════════════════════════════════════╗
 ║   Hospital Management System - Server Running  ║
 ╠════════════════════════════════════════════════╣
-║ Server:     http://localhost:${PORT}
-║ Environment: ${NODE_ENV}
-║ API Base:   http://localhost:${PORT}/api
+║ Server:     http://localhost:${PORT}           ║
+║ Environment: ${NODE_ENV}                       ║
+║ API Base:   http://localhost:${PORT}/api       ║
 ╚════════════════════════════════════════════════╝
       `);
     });

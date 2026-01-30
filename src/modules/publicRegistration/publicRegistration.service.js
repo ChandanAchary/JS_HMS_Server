@@ -150,8 +150,8 @@ export class PublicRegistrationService {
     // Get form template for validation
     const { template } = await this.getRegistrationForm(hospitalId, validatedRole);
 
-    // Validate form data against template
-    const validationResult = await this._validateFormSubmission(template, formData);
+    // Validate form data against template (pass file for file field validation)
+    const validationResult = await this._validateFormSubmission(template, formData, file);
     if (!validationResult.isValid) {
       throw new ValidationError(
         'Form validation failed',
@@ -276,14 +276,16 @@ export class PublicRegistrationService {
       template = await this._initializeFormTemplate(hospital.id, validatedRole);
     }
 
-    // Validate form data
-    const validation = await this._validateFormSubmission(template, formData);
+    // Validate form data (pass profilePhotoFile for file field validation)
+    const validation = await this._validateFormSubmission(template, formData, profilePhotoFile);
     if (!validation.isValid) {
-      throw new ValidationError('Form validation failed', validation.errors);
+      const errorMessage = `Form validation failed: ${validation.errors.map(e => e.message).join(', ')}`;
+      console.error('[PublicRegistration] Validation failed:', validation.errors);
+      throw new ValidationError(errorMessage, validation.errors);
     }
 
     // Validate application fields
-    validateApplicationFields(formData);
+    validateApplicationFields(formData.email?.toLowerCase(), formData.fullName);
 
     // Extract profile photo URL
     const profilePhotoUrl = extractProfilePhotoUrl(profilePhotoFile);
@@ -292,12 +294,12 @@ export class PublicRegistrationService {
     // Create join request
     const joinRequest = await this.joinRequestRepository.create({
       hospitalId: hospital.id,
+      name: formData.fullName,
       email: formData.email.toLowerCase(),
-      phone: formData.phone,
-      fullName: formData.fullName,
+      phone: formData.mobileNumber,
       role: validatedRole,
-      formFields,
-      profilePhoto: profilePhotoUrl,
+      formData: formFields,
+      profilePic: profilePhotoUrl,
       status: 'PENDING'
     });
 
@@ -335,14 +337,18 @@ export class PublicRegistrationService {
   /**
    * Validate form submission against template schema
    */
-  async _validateFormSubmission(template, formData) {
+  async _validateFormSubmission(template, formData, fileUpload = null) {
     const fields = Array.isArray(template.schema) ? template.schema : [];
     const errors = [];
 
     for (const field of fields) {
       if (!field.isEnabled) continue;
 
-      const value = formData[field.fieldName];
+      // For file type fields, check the fileUpload parameter instead of formData
+      const fieldType = (field.fieldType || '').toLowerCase();
+      const value = fieldType === 'file' 
+        ? fileUpload 
+        : formData[field.fieldName];
 
       // Required field check
       if (field.isRequired && (value === undefined || value === null || value === '')) {

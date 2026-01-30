@@ -154,12 +154,16 @@ export class AuthService {
       throw new AuthenticationError('Invalid credentials');
     }
 
+    // Determine the role for token
+    // Admin has role field in DB, Doctor/Employee role is based on userType
+    const tokenRole = userType === 'ADMIN' ? user.role : userType;
+
     // Generate token
-    const permissions = await this.repository.getUserPermissions(user.role);
+    const permissions = await this.repository.getUserPermissions(tokenRole);
     const token = this.generateToken({
       id: user.id,
       email: user.email,
-      role: user.role,
+      role: tokenRole,
       permissions,
       hospitalId: user.hospitalId,
     });
@@ -173,7 +177,7 @@ export class AuthService {
         name: user.name,
         email: user.email,
         phone: user.phone,
-        role: user.role,
+        role: tokenRole,
         // Include mustChangePassword flag for admins
         mustChangePassword: userType === 'ADMIN' ? !user.isPasswordChanged : false,
         // Enterprise setup flow: flag if hospital needs configuration
