@@ -476,6 +476,113 @@ export const sendTransactionalEmail = async ({ to, subject, htmlContent, textCon
   });
 };
 
+/**
+ * Send password reset OTP email with enhanced security messaging
+ * @param {string} email - Recipient email
+ * @param {string} name - Recipient name
+ * @param {string} otp - 6-digit OTP
+ */
+export const sendPasswordResetEmail = async (email, name = "User", otp) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+      <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2 style="color: #dc2626; margin-top: 0;">🔐 Password Reset Request</h2>
+        <p>Hi <strong>${name}</strong>,</p>
+        
+        <p style="font-size: 16px; line-height: 1.6;">
+          We received a request to reset your password. Use the verification code below to complete your password reset:
+        </p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <div style="background-color: #f3f4f6; border: 2px dashed #9ca3af; padding: 20px; border-radius: 8px; display: inline-block;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1f2937;">${otp}</span>
+          </div>
+        </div>
+        
+        <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #991b1b;">
+            <strong>⏰ This code expires in 10 minutes.</strong><br>
+            Do not share this code with anyone.
+          </p>
+        </div>
+        
+        <div style="background-color: #fefce8; border-left: 4px solid #ca8a04; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #854d0e;">
+            <strong>🔒 Security Notice:</strong> If you did not request this password reset, please ignore this email. Your password will remain unchanged.
+          </p>
+        </div>
+        
+        <p style="color: #888; font-size: 12px; margin-top: 30px;">
+          Hospital Management System | ${new Date().getFullYear()}<br>
+          This is an automated security email.
+        </p>
+      </div>
+    </div>
+  `;
+
+  return sendViaBrevo({
+    sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+    to: [{ email }],
+    subject: "🔐 Password Reset Code - Hospital Management System",
+    htmlContent: html,
+    textContent: `Your password reset code is: ${otp}. This code expires in 10 minutes. Do not share it with anyone. If you did not request this, please ignore this email.`
+  });
+};
+
+/**
+ * Send password changed confirmation email
+ * @param {string} email - Recipient email
+ * @param {string} name - Recipient name
+ */
+export const sendPasswordChangedEmail = async (email, name = "User") => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+      <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2 style="color: #10b981; margin-top: 0;">✅ Password Changed Successfully</h2>
+        <p>Hi <strong>${name}</strong>,</p>
+        
+        <p style="font-size: 16px; line-height: 1.6;">
+          Your password has been successfully changed. You can now use your new password to log in to your account.
+        </p>
+        
+        <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #065f46;">
+            <strong>✓ Password Updated</strong> - ${new Date().toLocaleString()}
+          </p>
+        </div>
+        
+        <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #991b1b;">
+            <strong>⚠️ Didn't make this change?</strong><br>
+            If you did not change your password, your account may have been compromised. Please contact your administrator immediately and request a password reset.
+          </p>
+        </div>
+        
+        <h3 style="color: #333;">Security Tips:</h3>
+        <ul style="color: #555; line-height: 1.8;">
+          <li>Never share your password with anyone</li>
+          <li>Use a strong, unique password</li>
+          <li>Enable two-factor authentication if available</li>
+          <li>Log out from shared or public devices</li>
+        </ul>
+        
+        <p style="color: #888; font-size: 12px; margin-top: 30px;">
+          Hospital Management System | ${new Date().getFullYear()}<br>
+          This is an automated security notification.
+        </p>
+      </div>
+    </div>
+  `;
+
+  return sendViaBrevo({
+    sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+    to: [{ email }],
+    subject: "✅ Password Changed Successfully - Hospital Management System",
+    htmlContent: html,
+    textContent: `Your password has been successfully changed. If you did not make this change, please contact your administrator immediately.`
+  });
+};
+
 export default {
   sendEmailVerification,
   sendRegistrationInvite,
@@ -486,5 +593,7 @@ export default {
   sendLoginOtpConfirmation,
   sendRegistrationConfirmation,
   sendTenantWelcomeEmail,
-  sendTransactionalEmail
+  sendTransactionalEmail,
+  sendPasswordResetEmail,
+  sendPasswordChangedEmail
 };

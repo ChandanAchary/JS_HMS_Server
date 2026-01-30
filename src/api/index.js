@@ -8,6 +8,7 @@ import logger from '../core/utils/logger.js';
 
 // Module Routes
 import { createAuthRoutes } from '../modules/auth/index.js';
+import { createPasswordRoutes } from '../modules/password/index.js';
 import { employeeRoutes } from '../modules/employee/index.js';
 import { doctorRoutes } from '../modules/doctor/index.js';
 import { patientRoutes } from '../modules/patient/index.js';
@@ -41,6 +42,9 @@ export function initializeApiRoutes(prisma) {
   // Auth routes (login, register, password reset - some protected)
   router.use('/auth', createAuthRoutes(prisma));
 
+  // Password management routes (forgot password, reset, change with OTP)
+  router.use('/password', createPasswordRoutes(prisma));
+
   // Public registration routes (no auth required)
   router.use('/public', publicRegistrationRoutes);
 
@@ -69,7 +73,7 @@ export function initializeApiRoutes(prisma) {
   // Admin routes (protected internally with adminOnly)
   router.use('/admin', adminRoutes);
 
-  logger.info('[API] Routes initialized - 10 modules mounted');
+  logger.info('[API] Routes initialized - 11 modules mounted');
 
   return router;
 }
@@ -85,6 +89,7 @@ export function getApiInfo() {
     modules: [
       'setup',
       'auth',
+      'password',
       'employees',
       'doctors',
       'patients',

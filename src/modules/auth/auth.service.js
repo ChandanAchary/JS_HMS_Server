@@ -171,6 +171,10 @@ export class AuthService {
     // Check if admin needs to configure hospital (Phase 3 of setup)
     const hospitalSetupRequired = userType === 'ADMIN' && !user.hospitalId;
 
+    // Check if user must change password (first login)
+    // All user types have isPasswordChanged field in schema
+    const mustChangePassword = user.isPasswordChanged === false;
+
     return {
       user: {
         id: user.id,
@@ -178,8 +182,8 @@ export class AuthService {
         email: user.email,
         phone: user.phone,
         role: tokenRole,
-        // Include mustChangePassword flag for admins
-        mustChangePassword: userType === 'ADMIN' ? !user.isPasswordChanged : false,
+        // Include mustChangePassword flag for all users (first login flow)
+        mustChangePassword: mustChangePassword,
         // Enterprise setup flow: flag if hospital needs configuration
         hospitalSetupRequired: hospitalSetupRequired,
       },
