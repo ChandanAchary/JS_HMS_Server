@@ -20,8 +20,7 @@ export class AuthRepository {
       // Try to find admin
       const admin = await this.prisma.admin.findFirst({
         where: { 
-          email: emailOrPhone.toLowerCase(),
-          isDeleted: false
+          email: emailOrPhone.toLowerCase()
         },
       }).catch(() => null);
 
@@ -30,8 +29,7 @@ export class AuthRepository {
       // Try to find employee
       const employee = await this.prisma.employee.findFirst({
         where: { 
-          email: emailOrPhone.toLowerCase(),
-          isDeleted: false
+          email: emailOrPhone.toLowerCase()
         },
       }).catch(() => null);
 
@@ -40,8 +38,7 @@ export class AuthRepository {
       // Try to find doctor
       const doctor = await this.prisma.doctor.findFirst({
         where: { 
-          email: emailOrPhone.toLowerCase(),
-          isDeleted: false
+          email: emailOrPhone.toLowerCase()
         },
       }).catch(() => null);
 
@@ -52,8 +49,7 @@ export class AuthRepository {
 
       const empByPhone = await this.prisma.employee.findFirst({
         where: { 
-          phone: cleanPhone,
-          isDeleted: false
+          phone: cleanPhone
         },
       }).catch(() => null);
 
@@ -61,8 +57,7 @@ export class AuthRepository {
 
       const docByPhone = await this.prisma.doctor.findFirst({
         where: { 
-          phone: cleanPhone,
-          isDeleted: false
+          phone: cleanPhone
         },
       }).catch(() => null);
 
@@ -85,8 +80,7 @@ export class AuthRepository {
 
       return await model.findFirst({
         where: { 
-          email: email.toLowerCase(),
-          isDeleted: false
+          email: email.toLowerCase()
         },
       });
     } catch (error) {

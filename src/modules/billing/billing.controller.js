@@ -31,7 +31,29 @@ export const billingLogin = async (req, res, next) => {
 export const createPatient = async (req, res, next) => {
   try {
     const service = new BillingService(req.tenantPrisma);
-    const result = await service.createPatient(req.body, req.user.hospitalId);
+
+    // Normalize input: accept both `name` and `patientName` (and `fullName`) for compatibility
+    const input = {
+      name: req.body.name || req.body.patientName || req.body.fullName || '',
+      phone: req.body.phone,
+      age: req.body.age,
+      dateOfBirth: req.body.dateOfBirth,
+      gender: req.body.gender,
+      email: req.body.email,
+      address: req.body.address,
+    };
+
+    // Resolve hospitalId from various sources (token, tenant resolver, request) for single-tenant
+    const hospitalId = req.user?.hospitalId || req.hospitalId || req.tenantId || req.hospital?.id;
+
+    if (!hospitalId) {
+      // If still missing, return a clear error instead of letting Prisma throw
+      const err = new Error('hospitalId is required to create a patient');
+      err.status = 400;
+      throw err;
+    }
+
+    const result = await service.createPatient(input, hospitalId);
     
     const status = result.isExisting ? HttpStatus.OK : HttpStatus.CREATED;
     return res.status(status).json(

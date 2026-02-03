@@ -97,6 +97,23 @@ export const getJoinRequests = async (req, res, next) => {
 };
 
 /**
+ * Get single join request (admin)
+ * GET /api/v1/onboarding/admin/join-requests/:id
+ */
+export const getJoinRequest = async (req, res, next) => {
+  try {
+    const service = new OnboardingService(req.tenantPrisma);
+    const result = await service.getJoinRequest(req.params.id, req.user.hospitalId);
+
+    return res.status(HttpStatus.OK).json(
+      ApiResponse.success(result)
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Get application status (public)
  * GET /api/v1/onboarding/public/join-requests/status?email=...
  */
@@ -313,6 +330,7 @@ export default {
   submitJoinRequest,
   submitJoinApplication,
   getJoinRequests,
+  getJoinRequest,
   getApplicationStatus,
   sendRegistrationInviteToRequest,
   rejectJoinRequest,

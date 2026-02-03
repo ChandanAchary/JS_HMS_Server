@@ -8,7 +8,7 @@
  * 
  * Includes connection initialization with retry logic and error handling.
  */
-
+ 
 import { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger.js';
 
@@ -74,14 +74,33 @@ export function initializeTenantPrisma() {
 export const tenantPrisma = initializeTenantPrisma();
 
 export async function connectDB() {
-  try {
-    // Simply ensure connection works
-    await tenantPrisma.$queryRaw`SELECT 1`;
-    logger.info('[Tenant DB] Connection successful');
-    return true;
-  } catch (error) {
-    logger.error('[Tenant DB] Connection failed:', error.message);
-    throw error;
+  const maxRetries = 3;
+  let retryCount = 0;
+
+  while (retryCount < maxRetries) {
+    try {
+      // Test connection with retry logic
+      await tenantPrisma.$queryRaw`SELECT 1`;
+      logger.info('[Tenant DB] Connection successful');
+      return true;
+    } catch (error) {
+      retryCount++;
+      const isLastAttempt = retryCount === maxRetries;
+      
+      if (isLastAttempt) {
+        logger.error('[Tenant DB] Connection failed after 3 attempts:', error.message);
+        logger.error('[Tenant DB] Make sure:');
+        logger.error('  1. DATABASE_URL is set in .env file');
+        logger.error('  2. Database server is running and accessible');
+        logger.error('  3. Network connection is available');
+        logger.error('  4. Firewall is not blocking the connection');
+        throw error;
+      } else {
+        const waitTime = 1000 * retryCount;
+        logger.warn(`[Tenant DB] Connection attempt ${retryCount} failed, retrying in ${waitTime}ms...`);
+        await sleep(waitTime);
+      }
+    }
   }
 }
 

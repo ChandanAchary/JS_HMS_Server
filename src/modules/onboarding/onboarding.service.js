@@ -227,6 +227,23 @@ export class OnboardingService {
   }
 
   /**
+   * Get a single join request by id (admin)
+   */
+  async getJoinRequest(joinRequestId, hospitalId) {
+    const joinRequest = await this.joinRequestRepo.findById(joinRequestId);
+    if (!joinRequest) {
+      throw new NotFoundError('Join request not found');
+    }
+
+    if (String(joinRequest.hospitalId) !== String(hospitalId)) {
+      throw new ForbiddenError('Access denied');
+    }
+
+    // Return full join request so admin can view the filled form
+    return { joinRequest };
+  }
+
+  /**
    * Get application status by email
    */
   async getApplicationStatus(email) {
@@ -346,6 +363,17 @@ export class OnboardingService {
         throw new ConflictError('Doctor already exists with this email');
       }
 
+      // Check if phone is already used by another doctor
+      const phoneExists = await this.prisma.doctor.findFirst({
+        where: { 
+          phone: joinRequest.phone || '',
+          NOT: { id: undefined } // Ensure we find any existing records
+        }
+      });
+      if (phoneExists) {
+        throw new ConflictError('Doctor already exists with this phone number');
+      }
+
       const doctor = await this.prisma.doctor.create({
         data: {
           name: joinRequest.name,
@@ -383,13 +411,33 @@ export class OnboardingService {
       throw new ConflictError('Employee already exists with this email');
     }
 
+    // Check if phone is already used by another employee
+    const phoneExists = await this.prisma.employee.findFirst({
+      where: { 
+        phone: joinRequest.phone || '',
+        NOT: { id: undefined } // Ensure we find any existing records
+      }
+    });
+    if (phoneExists) {
+      throw new ConflictError('Employee already exists with this phone number');
+    }
+
+    // Validate that appliedRole is set - cannot use generic EMPLOYEE role
+    if (!joinRequest.appliedRole) {
+      throw new ValidationError(
+        `Cannot approve employee: Applied role is missing. ` +
+        `Employee must apply for a specific role (e.g., PATHOLOGY, XRAY, NURSE_OPD, BILLING_ENTRY, etc.), ` +
+        `not a generic EMPLOYEE position.`
+      );
+    }
+
     const employee = await this.prisma.employee.create({
       data: {
         name: joinRequest.name,
         email: joinRequest.email,
         phone: joinRequest.phone || '',
         hospitalId: joinRequest.hospitalId,
-        role: joinRequest.appliedRole || 'EMPLOYEE',
+        role: joinRequest.appliedRole,
         qualification: joinRequest.qualifications?.length ? joinRequest.qualifications[0] : '',
         profilePic: joinRequest.profilePic || '',
         password: hashedPassword,
@@ -525,6 +573,15 @@ export class OnboardingService {
     validatePasswordRegistration(data);
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
+
+    // Validate that role is set and is not the generic EMPLOYEE
+    if (!data.role || data.role === 'EMPLOYEE') {
+      throw new ValidationError(
+        `Invalid role for employee registration. ` +
+        `Employee must register with a specific role (e.g., PATHOLOGY, XRAY, NURSE_OPD, BILLING_ENTRY, etc.), ` +
+        `not the generic EMPLOYEE role.`
+      );
+    }
 
     const employee = await this.prisma.employee.create({
       data: {

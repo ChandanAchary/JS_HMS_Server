@@ -24,7 +24,7 @@ async function startServer() {
 
     // Get Prisma client
     const prisma = getPrisma();
-
+ 
     // Create Express app
     const app = createApp(prisma);
 

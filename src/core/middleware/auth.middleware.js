@@ -11,7 +11,7 @@ import { AuthenticationError } from '../../shared/exceptions/AppError.js';
  * For single-tenant: Ensure token is valid and belongs to the single hospital
  * Token MUST contain `role` to support RBAC
  */
-export const protect = (req, res, next) => {
+export const protect = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -35,9 +35,21 @@ export const protect = (req, res, next) => {
       return next();
     }
 
-    // For single-tenant: hospitalId should be present in token
-    const hospitalId = decoded.hospitalId;
+    // For single-tenant: prefer hospitalId from token, otherwise fall back to resolved tenant
+    let hospitalId = decoded.hospitalId || req.hospitalId || req.hospital?.id;
+
+    // If still not found, and Prisma client is available (resolveTenant should have attached it), try to load the single hospital
+    if (!hospitalId && req.prisma) {
+      try {
+        const hospital = await req.prisma.hospital.findFirst({ where: { isActive: true }, select: { id: true } });
+        hospitalId = hospital?.id;
+      } catch (err) {
+        // ignore DB errors here; we'll throw below if still not found
+      }
+    }
+
     if (!hospitalId) {
+      // In a multi-tenant system you'd require hospitalId on token; for single-tenant we can infer it
       throw new AuthenticationError('Token missing hospitalId');
     }
 

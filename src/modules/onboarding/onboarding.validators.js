@@ -3,6 +3,7 @@
  */
 
 import { ValidationError } from '../../shared/exceptions/AppError.js';
+import { EMPLOYEE_ROLES, DOCTOR_SPECIALIZATIONS } from '../../constants/roles.js';
 
 /**
  * Valid roles for onboarding
@@ -75,6 +76,24 @@ export const validateJoinApplication = (data) => {
 
   if (!data.phone?.trim()) {
     errors.push('Phone is required');
+  }
+
+  // For EMPLOYEE role, appliedRole is required and must be valid
+  if (data.role?.toUpperCase() === 'EMPLOYEE') {
+    if (!data.appliedRole?.trim()) {
+      errors.push('Applied Role is required for Employee position');
+    } else if (!EMPLOYEE_ROLES.includes(data.appliedRole.toUpperCase())) {
+      errors.push(`Invalid applied role. Must be one of: ${EMPLOYEE_ROLES.join(', ')}`);
+    }
+  }
+
+  // For DOCTOR role, specialization is required
+  if (data.role?.toUpperCase() === 'DOCTOR') {
+    if (!data.specialization?.trim()) {
+      errors.push('Specialization is required for Doctor position');
+    } else if (!DOCTOR_SPECIALIZATIONS.includes(data.specialization.toUpperCase())) {
+      errors.push(`Invalid specialization. Must be one of: ${DOCTOR_SPECIALIZATIONS.join(', ')}`);
+    }
   }
 
   if (errors.length > 0) {

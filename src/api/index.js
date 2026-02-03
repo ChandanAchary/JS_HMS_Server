@@ -18,6 +18,10 @@ import { adminRoutes } from '../modules/admin/index.js';
 import { onboardingRoutes } from '../modules/onboarding/index.js';
 import { routes as publicRegistrationRoutes } from '../modules/publicRegistration/index.js';
 import { setupRoutes } from '../modules/setup/index.js';
+import { diagnosticsRoutes } from '../modules/diagnostics/index.js';
+import { departmentRoutes } from '../modules/department/index.js';
+import { queueRoutes } from '../modules/queue/index.js';
+import { visitRouter } from '../modules/visit/index.js';
 
 /**
  * Initialize all API routes
@@ -51,6 +55,9 @@ export function initializeApiRoutes(prisma) {
   // Onboarding routes (public join requests, token registration)
   router.use('/onboarding', onboardingRoutes);
 
+  // Department routes (listing public, some protected)
+  router.use('/departments', departmentRoutes);
+
   // =====================
   // Protected Routes
   // =====================
@@ -70,10 +77,19 @@ export function initializeApiRoutes(prisma) {
   // Billing routes (protected internally)
   router.use('/billing', billingRoutes);
 
+  // Diagnostics routes (protected internally)
+  router.use('/diagnostics', diagnosticsRoutes);
+
+  // Queue management routes (protected internally)
+  router.use('/queue', queueRoutes);
+
+  // Visit management routes (protected internally)
+  router.use('/visits', visitRouter);
+
   // Admin routes (protected internally with adminOnly)
   router.use('/admin', adminRoutes);
 
-  logger.info('[API] Routes initialized - 11 modules mounted');
+  logger.info('[API] Routes initialized - 15 modules mounted');
 
   return router;
 }
@@ -95,6 +111,10 @@ export function getApiInfo() {
       'patients',
       'attendance',
       'billing',
+      'diagnostics',
+      'queue',
+      'visits',
+      'departments',
       'admin',
       'onboarding',
       'public'

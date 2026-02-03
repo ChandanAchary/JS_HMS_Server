@@ -100,6 +100,20 @@ model Hospital {
   joinRequests       JoinRequest[]
   registrationTokens RegistrationToken[]
   formTemplates      FormTemplate[]      @relation("HospitalFormTemplates")
+  
+  // Diagnostic relations
+  diagnosticTests    DiagnosticTest[]
+  diagnosticOrders   DiagnosticOrder[]
+  diagnosticResults  DiagnosticResult[]
+  externalPrescriptions ExternalPrescription[]
+  labSlots           LabSlot[]
+  diagnosticReportTemplates DiagnosticReportTemplate[]
+  diagnosticReports  DiagnosticReport[]
+  
+  // Queue relations
+  patientQueues      PatientQueue[]
+  serviceQueues      ServiceQueue[]
+  patientVisits      PatientVisit[]
 
   @@map("hospitals")
 }
@@ -222,6 +236,8 @@ model Employee {
   assignmentsAsAssignee Assignment[] @relation("EmployeeAssignments")
   bills                 Bill[]
   payrolls              Payroll[]    @relation("EmployeePayroll")
+  technicianSlots       LabSlot[]    @relation("TechnicianSlots")
+  serviceQueues         ServiceQueue[] // Queues where this employee serves
 
   @@unique([email, isDeleted])
   @@unique([phone, isDeleted])
@@ -291,6 +307,8 @@ model Doctor {
   attendance            Attendance[] @relation("DoctorAttendance")
   assignmentsAsAssignee Assignment[] @relation("DoctorAssignments")
   payrolls              Payroll[]    @relation("DoctorPayroll")
+  diagnosticOrders      DiagnosticOrder[] @relation("OrderingDoctor")
+  serviceQueues         ServiceQueue[] // Queues where this doctor serves
 
   @@unique([email, isDeleted])
   @@unique([phone, isDeleted])
@@ -311,16 +329,113 @@ model Patient {
   gender  String @default("Other") // Male, Female, Other
   phone   String @unique
   address String @default("")
+  
+  // Extended patient demographics (for reference range calculations)
+  dateOfBirth DateTime?
+  bloodGroup  String?    // A+, A-, B+, B-, AB+, AB-, O+, O-
+  isPregnant  Boolean    @default(false)
+  gestationalWeeks Int?  // For pregnancy-specific reference ranges
+  
+  // Location details (optional)
+  city    String?
+  state   String?
+  
+  // Emergency contact (optional)
+  emergencyContactName  String?
+  emergencyContactPhone String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
   bills Bill[]
+  diagnosticOrders   DiagnosticOrder[]
+  diagnosticResults  DiagnosticResult[]
+  diagnosticReports  DiagnosticReport[]
+  externalPrescriptions ExternalPrescription[]
+  patientQueues      PatientQueue[]
+  patientVisits      PatientVisit[]
 
   @@index([hospitalId])
   @@index([patientId])
   @@map("patients")
+}
+
+// ============== PATIENT VISIT ==============
+// Tracks patient visits for OPD, IPD, Diagnostics, and Other Services
+// This is the core model that drives queue management and billing
+model PatientVisit {
+  id        String @id @default(cuid())
+  visitId   String @unique // Human-readable: VIS260131001
+  
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  // ===== VISIT TYPE =====
+  // Main categories:
+  // - CONSULTATION_NEW: New OPD consultation
+  // - CONSULTATION_FOLLOWUP: Follow-up OPD consultation
+  // - ADMISSION_PLANNED: Planned IPD admission
+  // - ADMISSION_EMERGENCY: Emergency IPD admission
+  // - DIAGNOSTIC_INTERNAL: Internal hospital diagnostic tests
+  // - DIAGNOSTIC_EXTERNAL: External prescription for diagnostics
+  // - SERVICE_VACCINATION: Vaccination service
+  // - SERVICE_DRESSING: Dressing/Injection service
+  // - SERVICE_PHYSIOTHERAPY: Physiotherapy service
+  // - SERVICE_MISC: Miscellaneous services
+  visitType String
+  
+  // Human-readable category
+  visitCategory String // CONSULTATION, ADMISSION, DIAGNOSTIC, SERVICE
+  
+  // ===== VISIT DETAILS =====
+  chiefComplaint String? // Patient's main problem/reason for visit
+  symptoms       Json?   // ["fever", "cough", "headache"]
+  notes          String?
+  
+  // ===== STATUS =====
+  // REGISTERED: Visit registered, waiting in queue
+  // IN_PROGRESS: Currently being attended
+  // COMPLETED: Visit completed
+  // CANCELLED: Visit cancelled
+  status String @default("REGISTERED")
+  
+  // ===== DOCTOR ASSIGNMENT (for consultations) =====
+  assignedDoctorId   String?
+  assignedDoctorName String?
+  
+  // ===== DEPARTMENT (for services) =====
+  departmentCode String? // CARDIOLOGY, RADIOLOGY, LAB, PHARMACY
+  
+  // ===== PRIORITY =====
+  isEmergency Boolean @default(false)
+  priority    String  @default("NORMAL") // EMERGENCY, URGENT, PRIORITY, NORMAL
+  
+  // ===== BILL REFERENCE =====
+  billId String?
+  bill   Bill?   @relation(fields: [billId], references: [id])
+  
+  // ===== TIMESTAMPS =====
+  visitDate     DateTime @default(now())
+  registeredAt  DateTime @default(now())
+  startedAt     DateTime?
+  completedAt   DateTime?
+  
+  // ===== AUDIT =====
+  createdBy String? // Employee/Admin who registered the visit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([visitId])
+  @@index([visitType])
+  @@index([status])
+  @@index([visitDate])
+  @@map("patient_visits")
 }
 
 // ============== ATTENDANCE ==============
@@ -392,20 +507,66 @@ model Assignment {
   @@map("assignments")
 }
 
+// ============== COUNTER (for ID generation) ==============
+// Used for generating sequential IDs for patients and bills
+model Counter {
+  id        String   @id          // e.g., "PAT260131", "BILL260131"
+  seq       Int      @default(0)  // Current sequence number
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("counters")
+}
+
 // ============== BILL ==============
 model Bill {
   id         String    @id @default(cuid())
-  amount     Float
+  billId     String    @unique        // Human-readable bill ID: YYMMDD + sequence (e.g., "260131001")
+  
   hospitalId String
   Hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
 
+  // Patient reference (using patientId string, not foreign key for flexibility)
+  patientId  String                   // References Patient.patientId (e.g., "PAT2601310001")
+  Patient    Patient?  @relation(fields: [patientId], references: [patientId])
+
+  // Bill content
+  services     Json                   // Array of service items: [{serviceName, category, quantity, unitPrice, amount}]
+  totalAmount  Float                  // Sum of all service amounts
+  
+  // ===== EMERGENCY FLAG (for queue priority) =====
+  isEmergency  Boolean  @default(false)  // If true, patient gets top priority in queue
+  visitType    String?                    // OPD, IPD, EMERGENCY, DIAGNOSTIC
+  departmentCode String?                  // Target department code
+
+  // Payment tracking
+  paymentStatus String   @default("UNPAID")  // UNPAID, PARTIAL, PAID
+  paymentMode   String?                      // Cash, Card, UPI, NetBanking, Insurance, Other
+  paymentDetails Json?                       // Additional payment info (transaction ID, card last 4, etc.)
+
+  // Timestamps
+  billDate   DateTime  @default(now())  // Date of bill creation
+  lockedAt   DateTime?                  // When bill was finalized/paid
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
-  Employee   Employee? @relation(fields: [employeeId], references: [id])
-  employeeId String?
-  Patient    Patient?  @relation(fields: [patientId], references: [id])
-  patientId  String?
 
+  // Audit
+  createdBy  String?                   // Employee ID who created the bill
+  Employee   Employee? @relation(fields: [createdBy], references: [id])
+
+  // Diagnostic relations
+  diagnosticOrders DiagnosticOrder[]
+  
+  // Queue relations
+  patientQueues PatientQueue[]
+  
+  // Visit relations
+  patientVisits PatientVisit[]
+
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([billId])
+  @@index([billDate])
   @@map("bills")
 }
 
@@ -493,4 +654,1145 @@ model FormTemplate {
 
   @@unique([hospitalId, type], name: "hospitalId_type") // <-- composite unique used by findUnique
   @@map("form_templates")
+}
+
+// ============== DIAGNOSTIC TEST (Master Catalog) ==============
+model DiagnosticTest {
+  id            String   @id @default(cuid())
+  testCode      String   @unique
+  testName      String
+  shortName     String?
+  description   String?
+  
+  // Categorization
+  category      String   // BLOOD_TEST, IMAGING, CARDIAC, PATHOLOGY, RADIOLOGY, etc.
+  subCategory   String?  // CBC, LFT, X-RAY, etc.
+  department    String?  // LAB, RADIOLOGY, CARDIOLOGY
+  
+  // Pricing
+  basePrice     Float
+  discountedPrice Float?
+  taxRate       Float    @default(0)  // GST percentage
+  hsnSacCode    String?  // For GST compliance
+  
+  // Test specifications
+  sampleType    String?  // BLOOD, URINE, STOOL, SWAB, IMAGING, etc.
+  sampleVolume  String?  // "2ml", "5ml", etc.
+  tubeType      String?  // EDTA, SST, PLAIN, etc.
+  tubeColor     String?  // PURPLE, RED, YELLOW, etc.
+  
+  // Timing
+  turnaroundTime Int     @default(24) // In hours
+  fastingRequired Boolean @default(false)
+  fastingHours   Int?    // Hours of fasting required
+  
+  // Reference ranges (JSON for age/gender variations)
+  referenceRanges Json?  // [{ gender: "male", ageMin: 18, ageMax: 60, min: 12, max: 17, unit: "g/dL" }]
+  unit          String?  // mg/dL, g/dL, U/L, etc.
+  
+  // Service configuration
+  homeCollectionAvailable Boolean @default(true)
+  homeCollectionCharge    Float   @default(0)
+  isActive      Boolean  @default(true)
+  requiresAppointment Boolean @default(false)
+  
+  // Equipment/Method
+  equipmentRequired String?
+  testMethod    String?
+  
+  // Hospital association
+  hospitalId    String
+  hospital      Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  orderItems    DiagnosticOrderItem[]
+  
+  @@index([testCode])
+  @@index([category])
+  @@index([hospitalId])
+  @@map("diagnostic_tests")
+}
+
+// ============== DIAGNOSTIC ORDER ==============
+model DiagnosticOrder {
+  id              String   @id @default(cuid())
+  orderId         String   @unique  // DXO260131001
+  
+  // Patient info
+  patientId       String
+  patient         Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  // Hospital
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Order source
+  orderType       String   // DOCTOR_ORDERED, SELF_INITIATED, EMERGENCY
+  sourceType      String   // OPD, IPD, EMERGENCY, DIRECT
+  
+  // Referring info (for doctor-ordered)
+  referringDoctorId String?
+  referringDoctor   Doctor?  @relation("OrderingDoctor", fields: [referringDoctorId], references: [id])
+  consultationId    String?  // Link to consultation if from OPD
+  
+  // External prescription (for self-initiated)
+  externalPrescriptionId String?
+  externalPrescription   ExternalPrescription? @relation(fields: [externalPrescriptionId], references: [id])
+  
+  // Clinical info
+  clinicalIndication String?
+  urgency           String   @default("ROUTINE") // ROUTINE, URGENT, STAT
+  specialInstructions String?
+  
+  // Collection scheduling
+  collectionMode    String?  // WALK_IN, HOME_COLLECTION, MOBILE_VAN
+  collectionScheduledAt DateTime?
+  collectionSlotId  String?
+  collectionSlot    LabSlot? @relation(fields: [collectionSlotId], references: [id])
+  
+  // Collection details
+  collectionCompletedAt DateTime?
+  collectedBy       String?  // Employee/Technician ID
+  
+  // Pricing
+  totalAmount       Float    @default(0)
+  discountAmount    Float    @default(0)
+  taxAmount         Float    @default(0)
+  netAmount         Float    @default(0)
+  
+  // Insurance
+  insuranceCovered  Boolean  @default(false)
+  insuranceAmount   Float    @default(0)
+  patientAmount     Float    @default(0)
+  preAuthNumber     String?
+  preAuthStatus     String?  // PENDING, APPROVED, REJECTED
+  
+  // Billing link
+  billId            String?
+  bill              Bill?    @relation(fields: [billId], references: [id])
+  
+  // Status tracking
+  status            String   @default("CREATED") // CREATED, SCHEDULED, SAMPLE_COLLECTED, PROCESSING, PARTIAL_COMPLETE, COMPLETED, CANCELLED
+  statusHistory     Json?    // Array of status changes with timestamps
+  
+  // Result delivery
+  resultsDeliveredAt DateTime?
+  resultsDeliveryMode String? // SMS, EMAIL, PORTAL, PRINT
+  
+  // Audit
+  createdBy         String?  // User who created the order
+  cancelledBy       String?
+  cancellationReason String?
+  cancelledAt       DateTime?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  orderItems        DiagnosticOrderItem[]
+  diagnosticReports DiagnosticReport[]
+  patientQueues     PatientQueue[]
+  
+  @@index([orderId])
+  @@index([patientId])
+  @@index([hospitalId])
+  @@index([status])
+  @@index([collectionScheduledAt])
+  @@map("diagnostic_orders")
+}
+
+// ============== DIAGNOSTIC ORDER ITEM ==============
+model DiagnosticOrderItem {
+  id              String   @id @default(cuid())
+  
+  // Order reference
+  orderId         String
+  order           DiagnosticOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Test reference
+  testId          String
+  test            DiagnosticTest @relation(fields: [testId], references: [id])
+  
+  // Test snapshot (for historical accuracy)
+  testCode        String
+  testName        String
+  testCategory    String
+  
+  // Pricing snapshot
+  basePrice       Float
+  discountAmount  Float    @default(0)
+  taxAmount       Float    @default(0)
+  netPrice        Float
+  
+  // Sample info
+  sampleId        String?  @unique // SMPL260131001
+  sampleCollectedAt DateTime?
+  sampleQuality   String?  // GOOD, ACCEPTABLE, HEMOLYZED, LIPEMIC, CLOTTED
+  sampleRejected  Boolean  @default(false)
+  sampleRejectionReason String?
+  sampleCollectedBy String?
+  
+  // Barcode
+  barcodeGenerated Boolean @default(false)
+  barcodeData     String?
+  
+  // Processing
+  processingStartedAt DateTime?
+  processingCompletedAt DateTime?
+  analyzerId      String?  // Equipment/analyzer used
+  
+  // Status
+  status          String   @default("ORDERED") // ORDERED, SAMPLE_PENDING, SAMPLE_COLLECTED, PROCESSING, QC_PENDING, PATHOLOGIST_REVIEW, COMPLETED, REJECTED, CANCELLED
+  statusHistory   Json?
+  
+  // Result link
+  resultId        String?
+  result          DiagnosticResult? @relation(fields: [resultId], references: [id])
+  
+  // Priority
+  priority        String   @default("ROUTINE") // ROUTINE, URGENT, STAT
+  
+  // TAT tracking
+  expectedCompletionAt DateTime?
+  actualCompletionAt   DateTime?
+  tatBreached     Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([sampleId])
+  @@index([orderId])
+  @@index([testId])
+  @@index([status])
+  @@map("diagnostic_order_items")
+}
+
+// ============== DIAGNOSTIC RESULT ==============
+model DiagnosticResult {
+  id              String   @id @default(cuid())
+  
+  // Patient & Hospital
+  patientId       String
+  patient         Patient  @relation(fields: [patientId], references: [id])
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Test reference
+  testId          String
+  testCode        String
+  testName        String
+  
+  // Result values
+  resultValue     String?  // "13.5", "Positive", "Normal"
+  resultNumeric   Float?   // For numeric results
+  resultUnit      String?  // g/dL, mg/dL, etc.
+  
+  // Reference range at time of result
+  referenceMin    Float?
+  referenceMax    Float?
+  referenceText   String?  // For non-numeric reference ranges
+  
+  // Interpretation
+  interpretation  String?  // NORMAL, LOW, HIGH, CRITICAL_LOW, CRITICAL_HIGH, ABNORMAL
+  isCritical      Boolean  @default(false)
+  criticalNotified Boolean @default(false)
+  criticalNotifiedAt DateTime?
+  criticalNotifiedTo String?
+  
+  // For imaging/pathology
+  reportText      String?  // Detailed report/findings
+  impressions     String?  // Summary/impressions
+  recommendations String?  // Follow-up recommendations
+  
+  // Attachments
+  attachments     Json?    // Array of { type: "image", url: "...", description: "..." }
+  imageUrls       String[] @default([])
+  
+  // QC & Review
+  enteredBy       String?  // Lab technician ID
+  enteredAt       DateTime?
+  
+  qcCheckedBy     String?
+  qcCheckedAt     DateTime?
+  qcStatus        String?  // PENDING, PASSED, FAILED
+  qcNotes         String?
+  
+  reviewedBy      String?  // Pathologist/Radiologist ID
+  reviewedAt      DateTime?
+  reviewerNotes   String?
+  reviewerSignature String?
+  
+  // Status
+  status          String   @default("PENDING") // PENDING, ENTERED, QC_CHECKED, REVIEWED, APPROVED, RELEASED, AMENDED
+  isReleased      Boolean  @default(false)
+  releasedAt      DateTime?
+  releasedBy      String?
+  
+  // Amendments
+  isAmended       Boolean  @default(false)
+  amendmentReason String?
+  previousValues  Json?    // Store previous values when amended
+  
+  // Visibility
+  visibleToPatient Boolean @default(false)
+  patientViewedAt  DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  orderItems      DiagnosticOrderItem[]
+  
+  @@index([patientId])
+  @@index([hospitalId])
+  @@index([testId])
+  @@index([status])
+  @@map("diagnostic_results")
+}
+
+// ============== EXTERNAL PRESCRIPTION ==============
+model ExternalPrescription {
+  id              String   @id @default(cuid())
+  
+  // Patient
+  patientId       String
+  patient         Patient  @relation(fields: [patientId], references: [id])
+  
+  // Hospital
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Prescription details
+  prescriptionDate DateTime?
+  prescriptionImage String?  // URL to uploaded image
+  prescriptionPdf   String?  // URL to uploaded PDF
+  
+  // Referring doctor info
+  referringDoctorName String?
+  referringHospital   String?
+  referringDoctorPhone String?
+  referringDoctorRegNo String?
+  
+  // OCR extracted data
+  ocrExtractedText  String?
+  ocrExtractedTests Json?   // Array of extracted test names
+  ocrConfidence     Float?
+  
+  // Manual entry
+  manualEntryTests  Json?   // Array of manually entered test names
+  
+  // Validation
+  validationStatus  String   @default("PENDING") // PENDING, VALIDATED, REJECTED
+  validatedBy       String?
+  validatedAt       DateTime?
+  validationNotes   String?
+  
+  // Mapping to hospital tests
+  mappedTests       Json?   // [{ extractedName: "CBC", mappedTestId: "...", mappedTestCode: "LAB_CBC_001" }]
+  
+  // Status
+  status            String   @default("UPLOADED") // UPLOADED, PROCESSING, MAPPED, COMPLETED, REJECTED
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  orders            DiagnosticOrder[]
+  
+  @@index([patientId])
+  @@index([hospitalId])
+  @@index([status])
+  @@map("external_prescriptions")
+}
+
+// ============== LAB SLOT (Collection Scheduling) ==============
+model LabSlot {
+  id              String   @id @default(cuid())
+  
+  // Hospital
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Slot details
+  slotDate        DateTime @db.Date
+  slotStartTime   String   // "09:00", "14:30"
+  slotEndTime     String   // "09:15", "14:45"
+  slotDuration    Int      @default(15) // In minutes
+  
+  // Collection type
+  collectionType  String   @default("WALK_IN") // WALK_IN, HOME_COLLECTION, MOBILE_VAN
+  
+  // Location (for home collection/mobile van)
+  locationName    String?
+  locationAddress String?
+  
+  // Technician assignment
+  technicianId    String?
+  technician      Employee? @relation("TechnicianSlots", fields: [technicianId], references: [id])
+  
+  // Capacity
+  maxBookings     Int      @default(1)
+  currentBookings Int      @default(0)
+  
+  // Status
+  isAvailable     Boolean  @default(true)
+  isBlocked       Boolean  @default(false)
+  blockReason     String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  orders          DiagnosticOrder[]
+  
+  @@unique([hospitalId, slotDate, slotStartTime, collectionType])
+  @@index([hospitalId])
+  @@index([slotDate])
+  @@index([isAvailable])
+  @@map("lab_slots")
+}
+
+// ============== UNIVERSAL DIAGNOSTIC REPORT TEMPLATE ==============
+// Supports ALL diagnostic tests: Pathology, Imaging, Cardiology, Microbiology, Histopathology
+// Template Types: TABULAR, QUALITATIVE, NARRATIVE, HYBRID
+// Compliant with: NABL (ISO 15189), NABH, HL7 FHIR (DiagnosticReport)
+model DiagnosticReportTemplate {
+  id              String   @id @default(cuid())
+  
+  // Hospital (null = system default template)
+  hospitalId      String?
+  hospital        Hospital? @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // ===== TEMPLATE IDENTIFICATION =====
+  templateCode    String   // Unique code: "CBC_V1", "XRAY_CHEST_V1", "CULTURE_URINE_V1"
+  templateName    String   // Display name: "Complete Blood Count", "Chest X-Ray Report"
+  description     String?  // Template description
+  shortName       String?  // Abbreviated name for reports
+  
+  // ===== CATEGORIZATION (Indian Medical System) =====
+  category        String   // PATHOLOGY, RADIOLOGY, CARDIOLOGY, MICROBIOLOGY, HISTOPATHOLOGY, MOLECULAR
+  department      String   // LAB, RADIOLOGY, CARDIOLOGY, PATHOLOGY, NEUROLOGY, etc.
+  subDepartment   String?  // HEMATOLOGY, BIOCHEMISTRY, SEROLOGY, CT, MRI, etc.
+  testSubCategory String?  // CBC, LFT, KFT, X-RAY_CHEST, CULTURE_URINE, etc.
+  
+  // For specific test mapping (optional - overrides category default)
+  testId          String?  // Link to specific DiagnosticTest
+  testCode        String?  // Test code for quick lookup
+  
+  // ===== TEMPLATE TYPE (Universal Engine) =====
+  // TABULAR: CBC, LFT, KFT, Lipid, Electrolytes, Hormones
+  // QUALITATIVE: HIV, HBsAg, Dengue, COVID, Pregnancy, Widal
+  // SEMI_QUANTITATIVE: Widal, CRP, ESR, Procalcitonin
+  // CULTURE_SENSITIVITY: Urine Culture, Blood Culture, Wound Culture
+  // NARRATIVE: X-Ray, CT, MRI, Ultrasound, Endoscopy
+  // CLINICAL_NOTE: OPD Notes, Discharge Summary, Consultation
+  // HISTOPATHOLOGY: Biopsy, Cytology
+  // BLOOD_BANK: Cross Match, Blood Grouping
+  // PRE_ANESTHETIC: Pre-operative assessment
+  // MEDICO_LEGAL: Medico-legal reports
+  // MATERNITY: Maternity records
+  // NURSING_NOTE: Nursing observations
+  // LAB_QC: Quality control reports
+  // INSURANCE: Insurance claim reports
+  // HYBRID: Combination of multiple types
+  templateType    String   @default("TABULAR")
+  
+  // ===== HEADER CONFIGURATION =====
+  headerConfig    Json?    
+  // {
+  //   showLogo: true,
+  //   showHospitalName: true,
+  //   showHospitalAddress: true,
+  //   showPatientInfo: true,
+  //   showDoctorInfo: true,
+  //   showSpecimenInfo: true,
+  //   showBarcodeId: true,
+  //   reportTitle: "LABORATORY REPORT",
+  //   accreditationInfo: { nablLogo: true, nablNumber: "MC-xxxx" }
+  // }
+  
+  // ===== REPORT SECTIONS =====
+  sections        Json     @default("[]")
+  // [
+  //   { sectionId: "PATIENT_INFO", title: "Patient Information", layout: "INFO_BLOCK", order: 1 },
+  //   { sectionId: "SPECIMEN_INFO", title: "Specimen Details", layout: "KEY_VALUE", order: 2 },
+  //   { sectionId: "RESULTS", title: "Investigation Results", layout: "TABLE", order: 3 },
+  //   { sectionId: "FINDINGS", title: "Findings", layout: "TEXT", order: 4 },
+  //   { sectionId: "IMPRESSION", title: "Impression", layout: "TEXT", order: 5 },
+  //   { sectionId: "COMMENTS", title: "Comments", layout: "TEXT", order: 6 }
+  // ]
+  
+  // ===== FIELD DEFINITIONS (Data Entry Form) =====
+  fields          Json?    @default("[]")
+  // [
+  //   { 
+  //     code: "HB", 
+  //     label: "Hemoglobin", 
+  //     type: "number", 
+  //     unit: "g/dL",
+  //     sectionId: "RESULTS",
+  //     required: true,
+  //     order: 1,
+  //     validation: { min: 0, max: 25, step: 0.1 },
+  //     criticalValues: { low: 7, high: 20 },
+  //     fhirMapping: "Observation.valueQuantity"
+  //   }
+  // ]
+  
+  // ===== REFERENCE RANGES (Age/Gender/Pregnancy Aware) =====
+  referenceRanges Json?    @default("{}")
+  // {
+  //   "HB": {
+  //     "male": { "adult": { min: 13, max: 17 }, "child": { min: 11, max: 14 } },
+  //     "female": { "adult": { min: 12, max: 16 }, "pregnant": { min: 11, max: 14 } }
+  //   },
+  //   "WBC": { "all": { min: 4000, max: 11000 } }
+  // }
+  
+  // ===== CRITICAL VALUE RULES (Medico-Legal Requirement) =====
+  criticalValueRules Json? @default("{}")
+  // {
+  //   "HB": { criticalLow: 7, criticalHigh: 20, panicLow: 5, panicHigh: 22 },
+  //   "POTASSIUM": { criticalLow: 2.5, criticalHigh: 6.5, requiresNotification: true }
+  // }
+  
+  // ===== CALCULATED FIELDS (Auto-computed) =====
+  calculatedFields Json?   @default("[]")
+  // [
+  //   { code: "AG_RATIO", formula: "ALBUMIN / GLOBULIN", label: "A/G Ratio" },
+  //   { code: "INDIRECT_BIL", formula: "TOTAL_BILIRUBIN - DIRECT_BILIRUBIN", label: "Indirect Bilirubin" },
+  //   { code: "EGFR", formula: "CKD_EPI(CREATININE, AGE, GENDER)", label: "eGFR" }
+  // ]
+  
+  // ===== SPECIMEN CONFIGURATION =====
+  specimenConfig  Json?    @default("{}")
+  // {
+  //   sampleTypes: ["BLOOD", "SERUM"],
+  //   tubeTypes: ["EDTA", "PLAIN"],
+  //   tubeColors: ["PURPLE", "RED"],
+  //   volume: "3ml",
+  //   fastingRequired: true,
+  //   fastingHours: 12,
+  //   specialInstructions: "Collect in morning"
+  // }
+  
+  // ===== MULTI-SPECIMEN SUPPORT =====
+  supportsMultiSpecimen Boolean @default(false) // For Culture, Biopsy, Cytology
+  specimenSchema  Json?    @default("[]")
+  // [
+  //   { type: "PRIMARY", label: "Primary Specimen", required: true },
+  //   { type: "ADDITIONAL", label: "Additional Specimen", required: false }
+  // ]
+  
+  // ===== ATTACHMENT CONFIGURATION =====
+  attachmentConfig Json?   @default("{}")
+  // {
+  //   allowImages: true,
+  //   maxImages: 10,
+  //   allowPDF: true,
+  //   allowDICOM: true,
+  //   dicomViewerIntegration: true,
+  //   allowDocuments: false
+  // }
+  
+  // ===== REPEATABLE SECTIONS (Culture, Sensitivity) =====
+  repeatableSections Json? @default("[]")
+  // [
+  //   { 
+  //     sectionId: "ORGANISM", 
+  //     label: "Organism Isolated",
+  //     maxRepeats: 5,
+  //     fields: [
+  //       { code: "ORGANISM_NAME", label: "Organism", type: "text" },
+  //       { code: "COLONY_COUNT", label: "Colony Count", type: "text" }
+  //     ]
+  //   }
+  // ]
+  
+  // ===== SIGN-OFF WORKFLOW =====
+  signOffConfig   Json?    @default("{}")
+  // {
+  //   requiresTechnicianEntry: true,
+  //   requiresQCCheck: true,
+  //   requiresPathologistReview: true,
+  //   requiresDigitalSignature: true,
+  //   autoLockOnSignOff: true,
+  //   amendmentAllowed: true,
+  //   amendmentRequiresApproval: true
+  // }
+  
+  // ===== FOOTER CONFIGURATION =====
+  footerConfig    Json?    @default("{}")
+  // {
+  //   showSignature: true,
+  //   showQRCode: true,
+  //   showPageNumber: true,
+  //   disclaimer: "This report is valid only with authorized signature",
+  //   showMethodology: true,
+  //   showEquipmentInfo: true,
+  //   nablDisclaimer: "Test performed as per NABL accredited methods"
+  // }
+  
+  // ===== STYLING =====
+  styling         Json?    @default("{}")
+  // {
+  //   fontSize: 10,
+  //   fontFamily: "Arial",
+  //   tableStyle: "bordered",
+  //   colors: { normal: "#4CAF50", abnormal: "#FF9800", critical: "#F44336" },
+  //   headerBg: "#E3F2FD",
+  //   alternateRowBg: "#FAFAFA"
+  // }
+  
+  // ===== PRINT/PDF CONFIGURATION =====
+  printConfig     Json?    @default("{}")
+  // {
+  //   pageSize: "A4",
+  //   orientation: "portrait",
+  //   margins: { top: 20, right: 15, bottom: 20, left: 15 },
+  //   headerHeight: 80,
+  //   footerHeight: 60,
+  //   watermark: null
+  // }
+  
+  // ===== NABL/NABH COMPLIANCE =====
+  complianceConfig Json?   @default("{}")
+  // {
+  //   nablAccredited: true,
+  //   nablScope: ["Hematology", "Biochemistry"],
+  //   nabh: true,
+  //   testMethodology: "Automated Hematology Analyzer",
+  //   equipmentInfo: "Sysmex XN-1000",
+  //   uncertaintyOfMeasurement: "±5%",
+  //   reportFormat: "NABL_15189"
+  // }
+  
+  // ===== HL7 FHIR MAPPING (Future Interoperability) =====
+  fhirMapping     Json?    @default("{}")
+  // {
+  //   resourceType: "DiagnosticReport",
+  //   category: "laboratory",
+  //   codeSystem: "LOINC",
+  //   loincCode: "58410-2",
+  //   snomedCode: "26604007"
+  // }
+  
+  // ===== VALIDATION RULES =====
+  validationRules Json?    @default("{}")
+  // {
+  //   mandatoryFields: ["HB", "WBC", "PLATELET"],
+  //   conditionalFields: [{ if: "GENDER=female", then: "HCG_REQUIRED" }],
+  //   crossFieldValidation: [{ rule: "DIRECT_BIL <= TOTAL_BIL", message: "Direct bilirubin cannot exceed total" }]
+  // }
+  
+  // ===== INTERPRETATION RULES =====
+  interpretationRules Json? @default("[]")
+  // [
+  //   { condition: "HB < 10 && MCV < 80", interpretation: "Microcytic Anemia - Suggest Iron Studies" },
+  //   { condition: "HB < 10 && MCV > 100", interpretation: "Macrocytic Anemia - Suggest B12/Folate" }
+  // ]
+  
+  // ===== VERSION CONTROL =====
+  version         Int      @default(1)
+  previousVersionId String? // ID of previous version (for version history)
+  versionNotes    String?  // Notes for this version
+  lockedAt        DateTime? // When template was locked (after use in reports)
+  
+  // ===== STATUS =====
+  status          String   @default("DRAFT") // DRAFT, ACTIVE, LOCKED, DEPRECATED
+  isActive        Boolean  @default(true)
+  isDefault       Boolean  @default(false)
+  isSystemTemplate Boolean @default(false)
+  isEditable      Boolean  @default(true) // Becomes false after use in reports
+  
+  // ===== AUDIT TRAIL =====
+  createdBy       String?
+  updatedBy       String?
+  approvedBy      String?  // Who approved the template
+  approvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  diagnosticReports DiagnosticReport[]
+  templateAuditLogs TemplateAuditLog[]
+  
+  @@unique([hospitalId, templateCode])
+  @@index([hospitalId])
+  @@index([category])
+  @@index([department])
+  @@index([templateCode])
+  @@index([templateType])
+  @@index([isActive])
+  @@index([status])
+  @@map("diagnostic_report_templates")
+}
+
+// ============== TEMPLATE AUDIT LOG (NABL Requirement) ==============
+model TemplateAuditLog {
+  id              String   @id @default(cuid())
+  
+  templateId      String
+  template        DiagnosticReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  action          String   // CREATED, UPDATED, ACTIVATED, DEACTIVATED, LOCKED, VERSIONED
+  changes         Json?    // { field: "referenceRanges.HB.male", oldValue: {...}, newValue: {...} }
+  reason          String?  // Reason for change
+  
+  performedBy     String
+  performedAt     DateTime @default(now())
+  ipAddress       String?
+  userAgent       String?
+  
+  @@index([templateId])
+  @@index([performedAt])
+  @@map("template_audit_logs")
+}
+
+// ============== PATIENT QUEUE ==============
+// Queue management for hospital services (OPD consultation, diagnostics, billing counter)
+// Supports emergency priority, auto-queue from billing, real-time position tracking
+model PatientQueue {
+  id              String   @id @default(cuid())
+  
+  // Human-readable queue number
+  queueNumber     String   // Format: QUE260131001 or T-001 (Token format)
+  tokenNumber     Int      // Numeric token for display (1, 2, 3...)
+  
+  // Hospital
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Patient
+  patientId       String
+  patient         Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  // Bill reference (when queue created from billing)
+  billId          String?
+  bill            Bill?    @relation(fields: [billId], references: [id])
+  
+  // ===== SERVICE QUEUE ASSIGNMENT =====
+  // Which service queue this patient is waiting for
+  serviceQueueId  String
+  serviceQueue    ServiceQueue @relation(fields: [serviceQueueId], references: [id])
+  
+  // ===== PRIORITY SYSTEM =====
+  // EMERGENCY: Top priority (from billing isEmergency flag)
+  // URGENT: Second priority (from diagnostic urgency or doctor referral)
+  // PRIORITY: Third priority (senior citizens, pregnant, disabled)
+  // NORMAL: Standard queue
+  priority        String   @default("NORMAL") // EMERGENCY, URGENT, PRIORITY, NORMAL
+  priorityReason  String?  // "Emergency billing", "Senior citizen", "Doctor referral"
+  isEmergency     Boolean  @default(false)
+  
+  // ===== QUEUE POSITION =====
+  position        Int      @default(0) // Current position in queue (dynamic)
+  originalPosition Int?    // Original position when joined
+  estimatedWaitTime Int?   // Estimated wait in minutes
+  
+  // ===== STATUS TRACKING =====
+  // WAITING: In queue, waiting to be called
+  // CALLED: Called but not yet serving (announcement phase)
+  // SERVING: Currently being served
+  // COMPLETED: Service completed
+  // SKIPPED: Patient not present when called
+  // TRANSFERRED: Moved to another queue
+  // CANCELLED: Patient left/cancelled
+  status          String   @default("WAITING") // WAITING, CALLED, SERVING, COMPLETED, SKIPPED, TRANSFERRED, CANCELLED
+  
+  // ===== TIMESTAMPS =====
+  joinedAt        DateTime @default(now()) // When patient joined queue
+  calledAt        DateTime? // When patient was called
+  servedAt        DateTime? // When service started
+  completedAt     DateTime? // When service completed
+  
+  // ===== SERVICE INFO =====
+  serviceName     String?  // "Dr. Sharma Consultation", "CBC Test", etc.
+  serviceType     String?  // CONSULTATION, DIAGNOSTIC, BILLING, PHARMACY
+  
+  // ===== COUNTER/ROOM ASSIGNMENT =====
+  counterNumber   String?  // Counter/Room number: "Room 101", "Counter 3"
+  assignedToId    String?  // Doctor/Employee ID serving
+  assignedToName  String?  // Doctor/Employee name
+  assignedToRole  String?  // DOCTOR, LAB_TECHNICIAN, RECEPTIONIST
+  
+  // ===== SKIP/RECALL TRACKING =====
+  skipCount       Int      @default(0) // Times skipped
+  maxSkips        Int      @default(3) // Auto-cancel after max skips
+  lastSkippedAt   DateTime?
+  recalledAt      DateTime? // If recalled after skip
+  
+  // ===== TRANSFER TRACKING =====
+  transferredFrom String?  // Previous queue ID if transferred
+  transferredTo   String?  // New queue ID if transferred
+  transferReason  String?
+  
+  // ===== DIAGNOSTIC ORDER LINK =====
+  diagnosticOrderId String?
+  diagnosticOrder   DiagnosticOrder? @relation(fields: [diagnosticOrderId], references: [id])
+  
+  // ===== NOTES =====
+  notes           String?
+  specialNeeds    String?  // "Wheelchair", "Interpreter needed"
+  
+  // ===== NOTIFICATIONS =====
+  notificationSent Boolean @default(false)
+  notificationSentAt DateTime?
+  notificationMode String?  // SMS, APP_PUSH, DISPLAY
+  
+  // ===== AUDIT =====
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([hospitalId, queueNumber])
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([serviceQueueId])
+  @@index([status])
+  @@index([priority])
+  @@index([joinedAt])
+  @@index([position])
+  @@map("patient_queues")
+}
+
+// ============== SERVICE QUEUE ==============
+// Defines different service queues in the hospital
+// Examples: Dr. Sharma's OPD, Blood Collection Counter, Billing Counter
+model ServiceQueue {
+  id              String   @id @default(cuid())
+  
+  // Hospital
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Queue identification
+  queueCode       String   // "OPD_CARDIOLOGY_001", "LAB_BLOOD_001", "BILLING_001"
+  queueName       String   // "Cardiology OPD - Dr. Sharma"
+  shortName       String?  // "Cardio-1" (for display boards)
+  
+  // ===== QUEUE TYPE =====
+  serviceType     String   // CONSULTATION, DIAGNOSTIC, BILLING, PHARMACY, PROCEDURE
+  department      String?  // CARDIOLOGY, RADIOLOGY, PATHOLOGY, BILLING
+  
+  // ===== ASSIGNMENT (Who serves this queue) =====
+  // For doctor consultation
+  doctorId        String?
+  doctor          Doctor?  @relation(fields: [doctorId], references: [id])
+  
+  // For non-doctor services
+  employeeId      String?
+  employee        Employee? @relation(fields: [employeeId], references: [id])
+  
+  // Counter/Room
+  counterNumber   String?  // "Room 101", "Counter 3"
+  location        String?  // "Ground Floor, East Wing"
+  
+  // ===== QUEUE CONFIGURATION =====
+  maxCapacity     Int      @default(50) // Max patients per session
+  currentCount    Int      @default(0) // Current waiting patients
+  averageServiceTime Int   @default(15) // Average service time in minutes
+  
+  // ===== WORKING HOURS =====
+  // JSON: { "monday": { "start": "09:00", "end": "17:00" }, ... }
+  workingHours    Json?
+  breakTimes      Json?    // [{ "start": "13:00", "end": "14:00" }]
+  
+  // ===== STATUS =====
+  isActive        Boolean  @default(true)
+  isAcceptingPatients Boolean @default(true)
+  isPaused        Boolean  @default(false)
+  pauseReason     String?
+  
+  // ===== CURRENT STATE =====
+  currentToken    Int      @default(0) // Last called token
+  nextToken       Int      @default(1) // Next token to assign
+  currentServingId String? // Current patient being served
+  
+  // ===== DATE TRACKING =====
+  lastResetDate   DateTime? // When token counter was last reset
+  todayPatientCount Int    @default(0) // Patients served today
+  
+  // ===== PRIORITY CONFIGURATION =====
+  // How many normal patients to serve before priority
+  priorityRatio   Int      @default(3) // E.g., every 3rd patient is priority
+  emergencyFirst  Boolean  @default(true) // Always serve emergency first
+  
+  // ===== DISPLAY CONFIGURATION =====
+  displayEnabled  Boolean  @default(true)
+  displayMessage  String?  // Custom message for display board
+  announcementEnabled Boolean @default(true)
+  
+  // ===== STATISTICS =====
+  avgWaitTimeToday Int?    // Average wait time today in minutes
+  
+  // ===== AUDIT =====
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  patientQueues   PatientQueue[]
+  queueHistory    QueueHistory[]
+  
+  @@unique([hospitalId, queueCode])
+  @@index([hospitalId])
+  @@index([serviceType])
+  @@index([doctorId])
+  @@index([isActive])
+  @@map("service_queues")
+}
+
+// ============== QUEUE HISTORY ==============
+// Historical tracking for analytics and auditing
+model QueueHistory {
+  id              String   @id @default(cuid())
+  
+  // Hospital
+  hospitalId      String
+  
+  // Service queue
+  serviceQueueId  String
+  serviceQueue    ServiceQueue @relation(fields: [serviceQueueId], references: [id], onDelete: Cascade)
+  
+  // Patient queue entry
+  patientQueueId  String
+  
+  // Date
+  queueDate       DateTime @db.Date
+  
+  // Metrics
+  tokenNumber     Int
+  priority        String
+  position        Int
+  
+  // Timestamps
+  joinedAt        DateTime
+  calledAt        DateTime?
+  servedAt        DateTime?
+  completedAt     DateTime?
+  
+  // Calculated metrics
+  waitTimeMinutes Int?     // Time from join to serve
+  serviceTimeMinutes Int?  // Time from serve to complete
+  totalTimeMinutes Int?    // Total time in system
+  
+  // Status
+  finalStatus     String   // COMPLETED, SKIPPED, CANCELLED, TRANSFERRED
+  skipCount       Int      @default(0)
+  wasEmergency    Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([hospitalId])
+  @@index([serviceQueueId])
+  @@index([queueDate])
+  @@map("queue_history")
+}
+
+// ============== DIAGNOSTIC REPORT (Runtime Instance) ==============
+// This is the actual generated report for a patient
+// Linked to a specific template version for medico-legal compliance
+model DiagnosticReport {
+  id              String   @id @default(cuid())
+  reportId        String   @unique // Human-readable: RPT260131001
+  
+  // ===== HOSPITAL & PATIENT =====
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  patientId       String
+  patient         Patient  @relation(fields: [patientId], references: [id])
+  
+  // ===== TEMPLATE REFERENCE (Immutable after creation) =====
+  templateId      String
+  template        DiagnosticReportTemplate @relation(fields: [templateId], references: [id])
+  templateVersion Int      // Snapshot of template version used
+  templateSnapshot Json?   // Full template snapshot for legal compliance
+  
+  // ===== ORDER REFERENCE =====
+  diagnosticOrderId String?
+  diagnosticOrder   DiagnosticOrder? @relation(fields: [diagnosticOrderId], references: [id])
+  orderItemId     String?  // Specific order item if applicable
+  
+  // ===== REPORT METADATA =====
+  testCode        String
+  testName        String
+  testCategory    String
+  reportType      String   // TABULAR, QUALITATIVE, NARRATIVE, HYBRID
+  
+  // ===== SPECIMEN INFORMATION (Multi-specimen support) =====
+  specimens       Json     @default("[]")
+  // [
+  //   {
+  //     specimenId: "SMPL001",
+  //     type: "BLOOD",
+  //     subType: "SERUM",
+  //     collectedAt: "2026-01-31T09:00:00Z",
+  //     collectedBy: "EMP123",
+  //     receivedAt: "2026-01-31T09:30:00Z",
+  //     quality: "GOOD",
+  //     volume: "5ml",
+  //     container: "SST_TUBE",
+  //     containerColor: "RED",
+  //     storageCondition: "ROOM_TEMP",
+  //     rejected: false
+  //   }
+  // ]
+  
+  // ===== RESULT DATA =====
+  results         Json     @default("{}")
+  // For TABULAR: { "HB": { value: 14.2, unit: "g/dL", status: "NORMAL" }, ... }
+  // For QUALITATIVE: { "HIV": { value: "NON_REACTIVE", status: "NORMAL" }, ... }
+  // For NARRATIVE: { "findings": "...", "impression": "...", "recommendations": "..." }
+  // For HYBRID: Combination of above
+  
+  // ===== REFERENCE RANGES USED =====
+  referenceRangesUsed Json? // Snapshot of reference ranges applied (age/gender specific)
+  
+  // ===== CALCULATED VALUES =====
+  calculatedResults Json?  @default("{}")
+  // { "AG_RATIO": { value: 1.5, formula: "ALBUMIN/GLOBULIN" } }
+  
+  // ===== INTERPRETATION =====
+  interpretation  String?  // Auto or manual interpretation
+  autoInterpretation String? // System-generated interpretation
+  manualInterpretation String? // Doctor-entered interpretation
+  impressions     String?
+  recommendations String?
+  
+  // ===== CRITICAL VALUE ALERTS =====
+  hasCriticalValues Boolean @default(false)
+  criticalValues  Json?    @default("[]")
+  // [{ field: "POTASSIUM", value: 6.8, threshold: 6.5, notifiedAt: "...", notifiedTo: "..." }]
+  criticalNotifiedAt DateTime?
+  criticalNotifiedTo String?
+  criticalAcknowledgedAt DateTime?
+  criticalAcknowledgedBy String?
+  
+  // ===== ATTACHMENTS (Imaging, Documents) =====
+  attachments     Json     @default("[]")
+  // [
+  //   { type: "IMAGE", url: "...", description: "PA View", uploadedAt: "...", uploadedBy: "..." },
+  //   { type: "DICOM", studyInstanceUID: "...", accessionNumber: "..." },
+  //   { type: "PDF", url: "...", description: "External Report" }
+  // ]
+  
+  // ===== REPEATABLE SECTIONS DATA =====
+  repeatableSectionsData Json? @default("[]")
+  // For Culture & Sensitivity:
+  // [
+  //   { 
+  //     sectionId: "ORGANISM_1",
+  //     data: { ORGANISM_NAME: "E. coli", COLONY_COUNT: ">10^5 CFU/ml" },
+  //     sensitivity: [
+  //       { antibiotic: "Amoxicillin", result: "R" },
+  //       { antibiotic: "Ciprofloxacin", result: "S" }
+  //     ]
+  //   }
+  // ]
+  
+  // ===== WORKFLOW STATUS =====
+  status          String   @default("DRAFT") // DRAFT, ENTERED, QC_PENDING, REVIEW_PENDING, APPROVED, RELEASED, AMENDED
+  workflowHistory Json     @default("[]")
+  // [{ status: "ENTERED", at: "...", by: "...", notes: "..." }]
+  
+  // ===== DATA ENTRY =====
+  enteredBy       String?
+  enteredAt       DateTime?
+  entryNotes      String?
+  
+  // ===== QC CHECK =====
+  qcStatus        String?  // PENDING, PASSED, FAILED, WAIVED
+  qcCheckedBy     String?
+  qcCheckedAt     DateTime?
+  qcNotes         String?
+  
+  // ===== PATHOLOGIST/RADIOLOGIST REVIEW =====
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  reviewerNotes   String?
+  reviewerDesignation String? // "Pathologist", "Radiologist", "Cardiologist"
+  
+  // ===== SIGN-OFF & APPROVAL =====
+  approvedBy      String?
+  approvedAt      DateTime?
+  approverDesignation String?
+  digitalSignature String? // Base64 encoded signature image
+  signatureVerified Boolean @default(false)
+  
+  // ===== RELEASE =====
+  isReleased      Boolean  @default(false)
+  releasedAt      DateTime?
+  releasedBy      String?
+  releaseMode     String?  // AUTO, MANUAL
+  
+  // ===== LOCKING (Medico-Legal) =====
+  isLocked        Boolean  @default(false)
+  lockedAt        DateTime?
+  lockedBy        String?
+  lockReason      String?  // SIGNED_OFF, AUTO_LOCKED, ADMIN_LOCKED
+  
+  // ===== AMENDMENTS (Post sign-off changes) =====
+  isAmended       Boolean  @default(false)
+  amendmentCount  Int      @default(0)
+  amendments      Json     @default("[]")
+  // [
+  //   {
+  //     amendmentId: "AMD001",
+  //     amendedAt: "...",
+  //     amendedBy: "...",
+  //     reason: "Transcription error",
+  //     previousValues: { "HB": 14.2 },
+  //     newValues: { "HB": 15.2 },
+  //     approvedBy: "...",
+  //     approvedAt: "..."
+  //   }
+  // ]
+  
+  // ===== PATIENT ACCESS =====
+  visibleToPatient Boolean @default(false)
+  patientViewedAt DateTime?
+  patientDownloadedAt DateTime?
+  patientAccessToken String? // For secure patient access
+  
+  // ===== DELIVERY =====
+  deliveryStatus  String?  // PENDING, SENT, DELIVERED, FAILED
+  deliveryMode    String?  // SMS, EMAIL, PORTAL, PRINT, WHATSAPP
+  deliveredAt     DateTime?
+  deliveryDetails Json?
+  
+  // ===== PRINT/PDF =====
+  printCount      Int      @default(0)
+  lastPrintedAt   DateTime?
+  lastPrintedBy   String?
+  pdfUrl          String?  // Generated PDF URL
+  pdfGeneratedAt  DateTime?
+  
+  // ===== FHIR EXPORT =====
+  fhirResourceId  String?  // If exported to FHIR server
+  fhirExportedAt  DateTime?
+  
+  // ===== BILLING =====
+  isBilled        Boolean  @default(false)
+  billId          String?
+  
+  // ===== TIMESTAMPS =====
+  reportDate      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([reportId])
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([templateId])
+  @@index([testCode])
+  @@index([status])
+  @@index([isReleased])
+  @@index([reportDate])
+  @@map("diagnostic_reports")
 }

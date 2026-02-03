@@ -138,6 +138,11 @@ export class BillingService {
    * Create patient
    */
   async createPatient(data, hospitalId) {
+    // Ensure hospitalId is provided (controller should set it, but validate here as a safeguard)
+    if (!hospitalId) {
+      throw new ValidationError('hospitalId is required');
+    }
+
     validatePatientCreate(data);
 
     // Check for existing patient
@@ -161,12 +166,14 @@ export class BillingService {
       const patient = await this.prisma.patient.create({
         data: {
           patientId,
-          hospitalId,
           name: data.name,
           age: data.age || null,
           gender: data.gender || null,
           phone: data.phone,
-          address: data.address || null
+          address: data.address || "",
+          hospital: {
+            connect: { id: hospitalId }
+          }
         }
       });
 
@@ -256,8 +263,16 @@ export class BillingService {
       throw new NotFoundError('Patient not found');
     }
 
-    // Validate services
-    const { services = [], paymentMode = 'Cash' } = data;
+    // Extract emergency and visit type flags
+    const { 
+      services = [], 
+      paymentMode = 'Cash',
+      isEmergency = false,
+      visitType = 'OPD',
+      departmentCode = null,
+      autoQueue = true  // Enable auto-queue by default
+    } = data;
+    
     validateServices(services);
 
     // Normalize and validate services against catalog
@@ -299,7 +314,7 @@ export class BillingService {
     // Generate bill ID
     const billId = await this.generateBillId();
 
-    // Create bill
+    // Create bill with emergency flag
     const bill = await this.prisma.bill.create({
       data: {
         billId,
@@ -309,13 +324,39 @@ export class BillingService {
         totalAmount,
         paymentMode,
         paymentStatus: 'UNPAID',
+        isEmergency,
+        visitType,
+        departmentCode,
         createdBy: createdBy || null
       }
     });
 
+    // Auto-queue the patient if enabled
+    let queueResult = null;
+    if (autoQueue && normalizedServices.length > 0) {
+      try {
+        const { QueueService } = await import('../queue/queue.service.js');
+        const queueService = new QueueService(this.prisma);
+        
+        queueResult = await queueService.autoQueueFromBilling({
+          billId: bill.id,
+          patientId,
+          isEmergency,
+          visitType,
+          departmentCode,
+          services: normalizedServices
+        }, hospitalId, createdBy);
+      } catch (error) {
+        // Log but don't fail the bill creation if queue fails
+        console.error('Auto-queue failed:', error.message);
+        queueResult = { error: error.message };
+      }
+    }
+
     return {
       message: 'Bill created successfully',
-      bill: formatBill(bill)
+      bill: formatBill(bill),
+      queue: queueResult
     };
   }
 
