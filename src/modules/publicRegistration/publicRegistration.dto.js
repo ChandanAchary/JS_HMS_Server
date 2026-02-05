@@ -129,7 +129,7 @@ export const extractFormFields = (formData) => ({
   qualification: formData.qualification || null,
   specialization: formData.specialization || formData.Specialization || null,
   licenseNumber: formData.medicalLicenseNumber || formData.license_number || null,
-  appliedRole: formData.roleAppliedFor || formData.role_applied_for || null
+  appliedRole: formData.roleApplied || formData.roleAppliedFor || formData.role_applied_for || null
 });
 
 export default {

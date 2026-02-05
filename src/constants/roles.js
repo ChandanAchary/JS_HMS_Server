@@ -14,8 +14,7 @@ export const EMPLOYEE_ROLES = [
   "PATHOLOGY",
   
   // Nursing
-  "NURSE_OPD",
-  "NURSE_IPD",
+  "NURSE",
   
   // Other Roles
   "RECEPTION",
@@ -55,8 +54,7 @@ export const ROLE_DISPLAY_NAMES = {
   MRI: "MRI",
   CT_SCAN: "CT Scan",
   PATHOLOGY: "Pathology",
-  NURSE_OPD: "Nurse (OPD)",
-  NURSE_IPD: "Nurse (IPD)",
+  NURSE: "Nurse",
   RECEPTION: "Reception",
   PHARMACY: "Pharmacy",
   WARD_ASSISTANT: "Ward Assistant",
@@ -340,8 +338,8 @@ export const DEPARTMENT_ROLE_MAPPING = {
   BILLING: ['BILLING_ENTRY', 'BILLING_EXIT'],
   PHARMACY: ['PHARMACY'],
   RECEPTION: ['RECEPTION'],
-  IPD: ['NURSE_IPD', 'WARD_ASSISTANT'],
-  OPD: ['NURSE_OPD'],
+  IPD: ['NURSE', 'WARD_ASSISTANT'],
+  OPD: ['NURSE'],
   SECURITY: ['SECURITY'],
   HOUSEKEEPING: ['HOUSEKEEPING']
 };

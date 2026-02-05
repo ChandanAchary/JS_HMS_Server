@@ -175,6 +175,42 @@ export class AuthService {
     // All user types have isPasswordChanged field in schema
     const mustChangePassword = user.isPasswordChanged === false;
 
+    // Build response user object with fallbacks for specialization/appliedRole
+    let specialization = user.specialization || null;
+    let appliedRole = user.appliedRole || user.roleApplied || null;
+
+    // For EMPLOYEE records the actual assigned role is typically stored in `employee.role`
+    if (tokenRole === 'EMPLOYEE' && !appliedRole) {
+      appliedRole = user.role || appliedRole || null;
+    }
+
+    // If still missing, try to fetch the latest join request as a fallback
+    if ((!specialization || !appliedRole) && this.repository.findLatestJoinRequestByEmail) {
+      try {
+        const joinReq = await this.repository.findLatestJoinRequestByEmail(user.email);
+        if (joinReq) {
+          // join request may store specialization or appliedRole either at root or inside formData
+          if (!specialization) {
+            specialization = joinReq.specialization || joinReq.appliedRole || specialization || null;
+            if (!specialization && joinReq.formData) {
+              const fd = typeof joinReq.formData === 'string' ? JSON.parse(joinReq.formData) : joinReq.formData;
+              specialization = fd?.specialization || fd?.speciality || specialization || null;
+            }
+          }
+          if (!appliedRole) {
+            appliedRole = joinReq.appliedRole || joinReq.roleApplied || appliedRole || null;
+            if (!appliedRole && joinReq.formData) {
+              const fd = typeof joinReq.formData === 'string' ? JSON.parse(joinReq.formData) : joinReq.formData;
+              appliedRole = fd?.roleApplied || fd?.roleAppliedFor || fd?.appliedRole || appliedRole || null;
+            }
+          }
+        }
+      } catch (err) {
+        // Non-fatal: log and continue with whatever we have
+        logger.warn('AuthService: join request fallback failed', err);
+      }
+    }
+
     return {
       user: {
         id: user.id,
@@ -186,6 +222,9 @@ export class AuthService {
         mustChangePassword: mustChangePassword,
         // Enterprise setup flow: flag if hospital needs configuration
         hospitalSetupRequired: hospitalSetupRequired,
+        // Expose doctor specialization or employee applied role when available
+        specialization: specialization || null,
+        appliedRole: appliedRole || null,
       },
       token,
       permissions,

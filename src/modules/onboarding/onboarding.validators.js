@@ -17,6 +17,7 @@ export const JOIN_REQUEST_STATUSES = ['PENDING', 'INVITED', 'FORM_SUBMITTED', 'A
 
 /**
  * Validate join request input
+ * For EMPLOYEE role, appliedRole is REQUIRED at submission time
  */
 export const validateJoinRequest = (data) => {
   const errors = [];
@@ -39,6 +40,24 @@ export const validateJoinRequest = (data) => {
 
   if (!data.hospitalId) {
     errors.push('Hospital ID is required');
+  }
+
+  // For EMPLOYEE role, appliedRole is required at submission time (proper RBAC)
+  if (data.role?.toUpperCase() === 'EMPLOYEE') {
+    if (!data.appliedRole?.trim()) {
+      errors.push('Applied Role is required for Employee position');
+    } else if (!EMPLOYEE_ROLES.includes(data.appliedRole.toUpperCase())) {
+      errors.push(`Invalid applied role. Must be one of: ${EMPLOYEE_ROLES.join(', ')}`);
+    }
+  }
+
+  // For DOCTOR role, specialization is required
+  if (data.role?.toUpperCase() === 'DOCTOR') {
+    if (!data.specialization?.trim()) {
+      errors.push('Specialization is required for Doctor position');
+    } else if (!DOCTOR_SPECIALIZATIONS.includes(data.specialization.toUpperCase())) {
+      errors.push(`Invalid specialization. Must be one of: ${DOCTOR_SPECIALIZATIONS.join(', ')}`);
+    }
   }
 
   if (errors.length > 0) {

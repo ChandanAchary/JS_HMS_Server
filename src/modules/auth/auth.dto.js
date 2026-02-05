@@ -34,7 +34,10 @@ export class LoginResponseDto {
       phone: user.phone,
       role: user.role,
       status: user.status,
-      avatar: user.avatar || null,
+      // For DOCTOR expose `specialization`, for EMPLOYEE expose `appliedRole`.
+      // `avatar` was unused in the codebase so we replace it with these role-specific fields.
+      ...(user.role === 'DOCTOR' ? { specialization: user.specialization || null } : {}),
+      ...(user.role === 'EMPLOYEE' ? { appliedRole: user.appliedRole || null } : {}),
     };
     this.token = token;
     this.permissions = permissions;

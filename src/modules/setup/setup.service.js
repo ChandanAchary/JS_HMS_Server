@@ -226,18 +226,117 @@ export class SetupService {
     if (!admin) {
       throw new NotFoundError('Admin not found.');
     }
-
+    // If admin already linked to a hospital, perform an update
     if (admin.hospitalId) {
-      throw new ConflictError('This admin already has a hospital configured.');
+      const updatedHospital = await this.prisma.hospital.update({
+        where: { id: admin.hospitalId },
+        data: {
+          hospitalName: hospitalData.hospitalName?.trim() || undefined,
+          address: hospitalData.address?.trim() || undefined,
+          contactEmail: hospitalData.contactEmail?.toLowerCase().trim() || undefined,
+          contactPhone: hospitalData.contactPhone ? hospitalData.contactPhone.replace(/\D/g, '') : undefined,
+          city: hospitalData.city?.trim() || undefined,
+          state: hospitalData.state?.trim() || undefined,
+          country: hospitalData.country?.trim() || undefined,
+          registrationType: hospitalData.registrationType?.trim() || undefined,
+          registrationNumber: hospitalData.registrationNumber?.trim() || undefined,
+          logo: hospitalData.logo || undefined
+        }
+      });
+
+      logger.info(`[Setup Phase 3] Hospital updated: ${updatedHospital.hospitalName} by admin: ${admin.email}`);
+
+      // Ensure system config reflects setup completion
+      await this.prisma.systemConfig.upsert({
+        where: { id: 'system_config' },
+        update: {
+          isSetupComplete: true,
+          setupCompletedAt: new Date(),
+          setupCompletedBy: adminId
+        },
+        create: {
+          id: 'system_config',
+          isSetupComplete: true,
+          setupCompletedAt: new Date(),
+          setupCompletedBy: adminId
+        }
+      });
+
+      return {
+        id: updatedHospital.id,
+        hospitalName: updatedHospital.hospitalName,
+        address: updatedHospital.address,
+        contactEmail: updatedHospital.contactEmail,
+        city: updatedHospital.city,
+        state: updatedHospital.state,
+        country: updatedHospital.country,
+        message: 'Hospital updated successfully.'
+      };
     }
 
-    // Check if hospital already exists
+    // Admin not linked to a hospital yet - check if any hospital exists in single-tenant
     const existingHospital = await this.prisma.hospital.findFirst();
     if (existingHospital) {
-      throw new ConflictError('A hospital already exists in the system. Single-tenant application.');
+      // Link admin to existing hospital and optionally update it
+      const hospital = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.hospital.update({
+          where: { id: existingHospital.id },
+          data: {
+            hospitalName: hospitalData.hospitalName?.trim() || existingHospital.hospitalName,
+            address: hospitalData.address?.trim() || existingHospital.address,
+            contactEmail: hospitalData.contactEmail?.toLowerCase().trim() || existingHospital.contactEmail,
+            contactPhone: hospitalData.contactPhone ? hospitalData.contactPhone.replace(/\D/g, '') : existingHospital.contactPhone,
+            city: hospitalData.city?.trim() || existingHospital.city,
+            state: hospitalData.state?.trim() || existingHospital.state,
+            country: hospitalData.country?.trim() || existingHospital.country,
+            registrationType: hospitalData.registrationType?.trim() || existingHospital.registrationType,
+            registrationNumber: hospitalData.registrationNumber?.trim() || existingHospital.registrationNumber,
+            logo: hospitalData.logo || existingHospital.logo
+          }
+        });
+
+        await tx.admin.update({
+          where: { id: adminId },
+          data: {
+            hospitalId: updated.id,
+            isOwner: true,
+            registrationStep: 'COMPLETE'
+          }
+        });
+
+        await tx.systemConfig.upsert({
+          where: { id: 'system_config' },
+          update: {
+            isSetupComplete: true,
+            setupCompletedAt: new Date(),
+            setupCompletedBy: adminId
+          },
+          create: {
+            id: 'system_config',
+            isSetupComplete: true,
+            setupCompletedAt: new Date(),
+            setupCompletedBy: adminId
+          }
+        });
+
+        return updated;
+      });
+
+      logger.info(`[Setup Phase 3] Existing hospital linked/updated: ${hospital.hospitalName} -> admin: ${admin.email}`);
+
+      return {
+        id: hospital.id,
+        hospitalName: hospital.hospitalName,
+        address: hospital.address,
+        contactEmail: hospital.contactEmail,
+        city: hospital.city,
+        state: hospital.state,
+        country: hospital.country,
+        message: 'Hospital linked and updated successfully.'
+      };
     }
 
-    // Create hospital
+    // No hospital exists - create a new one and link to admin
     const hospital = await this.prisma.$transaction(async (tx) => {
       const newHospital = await tx.hospital.create({
         data: {
@@ -322,6 +421,7 @@ export class SetupService {
         id: admin.hospital.id,
         hospitalName: admin.hospital.hospitalName,
         address: admin.hospital.address,
+        registrationNumber: admin.hospital.registrationNumber,
         city: admin.hospital.city,
         state: admin.hospital.state,
         country: admin.hospital.country

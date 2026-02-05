@@ -20,7 +20,7 @@ export class DiagnosticTemplateRepository {
         templateCode: data.templateCode,
         templateName: data.templateName,
         description: data.description,
-        testCategory: data.testCategory,
+        category: data.testCategory || data.category,
         testSubCategory: data.testSubCategory,
         testId: data.testId,
         testCode: data.testCode,
@@ -63,7 +63,7 @@ export class DiagnosticTemplateRepository {
         hospital: {
           select: {
             id: true,
-            name: true
+            hospitalName: true
           }
         }
       }
@@ -134,7 +134,7 @@ export class DiagnosticTemplateRepository {
     // Hospital-specific default
     let template = await this.prisma.diagnosticReportTemplate.findFirst({
       where: {
-        testCategory,
+        category: testCategory,
         hospitalId,
         isDefault: true,
         isActive: true
@@ -145,7 +145,7 @@ export class DiagnosticTemplateRepository {
     if (!template) {
       template = await this.prisma.diagnosticReportTemplate.findFirst({
         where: {
-          testCategory,
+          category: testCategory,
           hospitalId: null,
           isSystemTemplate: true,
           isDefault: true,
@@ -170,7 +170,7 @@ export class DiagnosticTemplateRepository {
     };
 
     if (filters.testCategory) {
-      where.testCategory = filters.testCategory;
+      where.category = filters.testCategory;
     }
 
     if (filters.templateType) {
@@ -188,14 +188,14 @@ export class DiagnosticTemplateRepository {
     return this.prisma.diagnosticReportTemplate.findMany({
       where,
       orderBy: [
-        { testCategory: 'asc' },
+        { category: 'asc' },
         { templateName: 'asc' }
       ],
       include: {
         hospital: {
           select: {
             id: true,
-            name: true
+            hospitalName: true
           }
         }
       }
@@ -213,7 +213,7 @@ export class DiagnosticTemplateRepository {
         isActive: true
       },
       orderBy: [
-        { testCategory: 'asc' },
+        { category: 'asc' },
         { templateName: 'asc' }
       ]
     });
@@ -225,7 +225,7 @@ export class DiagnosticTemplateRepository {
   async getTemplatesByCategory(testCategory, hospitalId = null) {
     return this.prisma.diagnosticReportTemplate.findMany({
       where: {
-        testCategory,
+        category: testCategory,
         isActive: true,
         OR: [
           { hospitalId },
@@ -312,7 +312,7 @@ export class DiagnosticTemplateRepository {
     // Remove default from other templates in same category
     await this.prisma.diagnosticReportTemplate.updateMany({
       where: {
-        testCategory,
+        category: testCategory,
         hospitalId,
         isDefault: true,
         id: { not: id }
@@ -347,7 +347,7 @@ export class DiagnosticTemplateRepository {
         templateCode: existing.templateCode,
         templateName: data.templateName || existing.templateName,
         description: data.description || existing.description,
-        testCategory: existing.testCategory,
+        category: existing.testCategory,
         testSubCategory: data.testSubCategory || existing.testSubCategory,
         testId: existing.testId,
         testCode: existing.testCode,
@@ -425,7 +425,7 @@ export class DiagnosticTemplateRepository {
         templateCode: source.templateCode,
         templateName: source.templateName,
         description: source.description,
-        testCategory: source.testCategory,
+        category: source.testCategory,
         testSubCategory: source.testSubCategory,
         testId: source.testId,
         testCode: source.testCode,
@@ -453,7 +453,7 @@ export class DiagnosticTemplateRepository {
    */
   async getTemplateStats(hospitalId) {
     const templates = await this.prisma.diagnosticReportTemplate.groupBy({
-      by: ['testCategory'],
+      by: ['category'],
       where: {
         isActive: true,
         OR: [
@@ -465,7 +465,7 @@ export class DiagnosticTemplateRepository {
     });
 
     return templates.map(t => ({
-      category: t.testCategory,
+      category: t.category,
       count: t._count.id
     }));
   }

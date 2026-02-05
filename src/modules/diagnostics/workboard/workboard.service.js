@@ -72,7 +72,7 @@ export class WorkboardService {
               patient: {
                 select: {
                   id: true,
-                  patientCode: true,
+                  patientId: true,
                   name: true,
                   age: true,
                   gender: true,
@@ -581,7 +581,7 @@ export class WorkboardService {
       } : null,
       patient: item.order?.patient ? {
         id: item.order.patient.id,
-        patientCode: item.order.patient.patientCode,
+        patientId: item.order.patient.patientId,
         name: item.order.patient.name,
         age: item.order.patient.age,
         gender: item.order.patient.gender
@@ -633,7 +633,7 @@ export class WorkboardService {
     if (!patient) return null;
     return {
       id: patient.id,
-      patientCode: patient.patientCode,
+      patientId: patient.patientId,
       name: patient.name,
       age: patient.age,
       gender: patient.gender,

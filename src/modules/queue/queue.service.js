@@ -12,6 +12,7 @@
  */
 
 import { QueueRepository } from './queue.repository.js';
+import { tenantContext } from '../../core/context/index.js';
 import {
   QUEUE_STATUS,
   QUEUE_PRIORITY,
@@ -42,7 +43,9 @@ export class QueueService {
   /**
    * Create a new service queue
    */
-  async createServiceQueue(data, hospitalId, userId) {
+  async createServiceQueue(data, userId) {
+    const hospitalId = tenantContext.getHospitalId();
+    
     // Validate required fields
     if (!data.queueCode || !data.queueName || !data.serviceType) {
       throw new ValidationError('queueCode, queueName, and serviceType are required');
@@ -90,7 +93,8 @@ export class QueueService {
   /**
    * Get all service queues for hospital
    */
-  async getServiceQueues(hospitalId, filters = {}) {
+  async getServiceQueues(filters = {}) {
+    const hospitalId = tenantContext.getHospitalId();
     const queues = await this.repository.getServiceQueues(hospitalId, filters);
     
     return {
@@ -104,7 +108,8 @@ export class QueueService {
   /**
    * Get service queue details with waiting list
    */
-  async getServiceQueueDetails(serviceQueueId, hospitalId) {
+  async getServiceQueueDetails(serviceQueueId) {
+    const hospitalId = tenantContext.getHospitalId();
     const queue = await this.repository.getServiceQueueById(serviceQueueId);
     
     if (!queue || queue.hospitalId !== hospitalId) {
@@ -133,7 +138,8 @@ export class QueueService {
   /**
    * Update service queue
    */
-  async updateServiceQueue(serviceQueueId, data, hospitalId) {
+  async updateServiceQueue(serviceQueueId, data) {
+    const hospitalId = tenantContext.getHospitalId();
     const queue = await this.repository.getServiceQueueById(serviceQueueId);
     
     if (!queue || queue.hospitalId !== hospitalId) {
@@ -151,7 +157,8 @@ export class QueueService {
   /**
    * Pause/Resume service queue
    */
-  async toggleQueueStatus(serviceQueueId, isPaused, reason, hospitalId) {
+  async toggleQueueStatus(serviceQueueId, isPaused, reason) {
+    const hospitalId = tenantContext.getHospitalId();
     const queue = await this.repository.getServiceQueueById(serviceQueueId);
     
     if (!queue || queue.hospitalId !== hospitalId) {
@@ -179,7 +186,8 @@ export class QueueService {
    * 2. Patient checks in manually
    * 3. Diagnostic order is created
    */
-  async addPatientToQueue(data, hospitalId, userId) {
+  async addPatientToQueue(data, userId) {
+    const hospitalId = tenantContext.getHospitalId();
     const {
       patientId,
       serviceQueueId,
@@ -333,7 +341,8 @@ export class QueueService {
    * Auto-add patient to queue from billing
    * Called when a bill is created with consultation/diagnostic services
    */
-  async autoQueueFromBilling(billData, hospitalId, userId) {
+  async autoQueueFromBilling(billData, userId) {
+    const hospitalId = tenantContext.getHospitalId();
     const { billId, patientId, isEmergency, visitType, departmentCode, services } = billData;
 
     // Get patient
@@ -354,7 +363,6 @@ export class QueueService {
       if (serviceType) {
         // Find appropriate service queue
         const serviceQueue = await this.findOrCreateServiceQueue(
-          hospitalId, 
           serviceType, 
           service,
           departmentCode
@@ -368,7 +376,7 @@ export class QueueService {
               billId,
               isEmergency,
               urgency: isEmergency ? 'STAT' : 'ROUTINE'
-            }, hospitalId, userId);
+            }, userId);
 
             queuedServices.push({
               service: service.serviceName,
@@ -426,7 +434,9 @@ export class QueueService {
   /**
    * Find or create a service queue
    */
-  async findOrCreateServiceQueue(hospitalId, serviceType, service, departmentCode) {
+  async findOrCreateServiceQueue(serviceType, service, departmentCode) {
+    const hospitalId = tenantContext.getHospitalId();
+    
     // Try to find existing queue
     const queues = await this.repository.getServiceQueues(hospitalId, {
       serviceType,
@@ -463,7 +473,8 @@ export class QueueService {
   /**
    * Call next patient
    */
-  async callNextPatient(serviceQueueId, hospitalId, userId) {
+  async callNextPatient(serviceQueueId, userId) {
+    const hospitalId = tenantContext.getHospitalId();
     const serviceQueue = await this.repository.getServiceQueueById(serviceQueueId);
     
     if (!serviceQueue || serviceQueue.hospitalId !== hospitalId) {
@@ -513,7 +524,8 @@ export class QueueService {
   /**
    * Start serving patient (after they respond to call)
    */
-  async startServing(patientQueueId, hospitalId, userId) {
+  async startServing(patientQueueId, userId) {
+    const hospitalId = tenantContext.getHospitalId();
     const patientQueue = await this.repository.getPatientQueueById(patientQueueId);
     
     if (!patientQueue || patientQueue.hospitalId !== hospitalId) {
@@ -540,7 +552,8 @@ export class QueueService {
   /**
    * Complete service for patient
    */
-  async completeService(patientQueueId, hospitalId, userId) {
+  async completeService(patientQueueId, userId) {
+    const hospitalId = tenantContext.getHospitalId();
     const patientQueue = await this.repository.getPatientQueueById(patientQueueId);
     
     if (!patientQueue || patientQueue.hospitalId !== hospitalId) {
@@ -611,7 +624,8 @@ export class QueueService {
   /**
    * Skip patient (not present when called)
    */
-  async skipPatient(patientQueueId, hospitalId, userId) {
+  async skipPatient(patientQueueId, userId) {
+    const hospitalId = tenantContext.getHospitalId();
     const patientQueue = await this.repository.getPatientQueueById(patientQueueId);
     
     if (!patientQueue || patientQueue.hospitalId !== hospitalId) {
@@ -673,7 +687,8 @@ export class QueueService {
   /**
    * Recall skipped patient
    */
-  async recallPatient(patientQueueId, hospitalId, userId) {
+  async recallPatient(patientQueueId, userId) {
+    const hospitalId = tenantContext.getHospitalId();
     const patientQueue = await this.repository.getPatientQueueById(patientQueueId);
     
     if (!patientQueue || patientQueue.hospitalId !== hospitalId) {
@@ -699,7 +714,8 @@ export class QueueService {
   /**
    * Transfer patient to another queue
    */
-  async transferPatient(patientQueueId, newServiceQueueId, reason, hospitalId, userId) {
+  async transferPatient(patientQueueId, newServiceQueueId, reason, userId) {
+    const hospitalId = tenantContext.getHospitalId();
     const patientQueue = await this.repository.getPatientQueueById(patientQueueId);
     
     if (!patientQueue || patientQueue.hospitalId !== hospitalId) {

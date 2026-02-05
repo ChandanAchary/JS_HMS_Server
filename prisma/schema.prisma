@@ -100,6 +100,7 @@ model Hospital {
   joinRequests       JoinRequest[]
   registrationTokens RegistrationToken[]
   formTemplates      FormTemplate[]      @relation("HospitalFormTemplates")
+  vitalSigns        VitalSigns[]
   
   // Diagnostic relations
   diagnosticTests    DiagnosticTest[]
@@ -114,6 +115,18 @@ model Hospital {
   patientQueues      PatientQueue[]
   serviceQueues      ServiceQueue[]
   patientVisits      PatientVisit[]
+  
+  // IPD relations
+  ipdAdmissionRequests IPDAdmissionRequest[] @relation("IPDAdmissionRequest")
+  ipdAdmissions      IPDAdmission[]          @relation("IPDAdmission")
+  ipdBeds            IPDBed[]                @relation("IPDBed")
+  ipdVitalSigns      IPDVitalSigns[]         @relation("IPDVitalSigns")
+  ipdProgressNotes   IPDProgressNote[]       @relation("IPDProgressNote")
+  ipdOrders          IPDOrder[]              @relation("IPDOrder")
+  ipdAlerts          IPDAlert[]              @relation("IPDAlert")
+  ipdConsents        IPDConsent[]            @relation("IPDConsent")
+  ipdMovements       IPDPatientMovement[]    @relation("IPDPatientMovement")
+  ipdDischargeSummaries IPDDischargeSummary[] @relation("IPDDischargeSummary")
 
   @@map("hospitals")
 }
@@ -343,6 +356,12 @@ model Patient {
   // Emergency contact (optional)
   emergencyContactName  String?
   emergencyContactPhone String?
+  
+  // Additional medical info
+  medicalHistory String?
+  allergies      String?
+  firstName      String?
+  lastName       String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -355,6 +374,13 @@ model Patient {
   externalPrescriptions ExternalPrescription[]
   patientQueues      PatientQueue[]
   patientVisits      PatientVisit[]
+  vitalSigns        VitalSigns[]
+  
+  // IPD relations
+  ipdAdmissionRequests IPDAdmissionRequest[] @relation("IPDAdmissionRequest")
+  ipdAdmissions      IPDAdmission[]          @relation("IPDAdmission")
+  ipdVitalSigns      IPDVitalSigns[]         @relation("IPDVitalSigns")
+  ipdMovements       IPDPatientMovement[]    @relation("IPDPatientMovement")
 
   @@index([hospitalId])
   @@index([patientId])
@@ -414,6 +440,9 @@ model PatientVisit {
   isEmergency Boolean @default(false)
   priority    String  @default("NORMAL") // EMERGENCY, URGENT, PRIORITY, NORMAL
   
+  // ===== IPD REQUIREMENT =====
+  requiresIPDAdmission Boolean @default(false) // Doctor marked as requiring IPD admission
+  
   // ===== BILL REFERENCE =====
   billId String?
   bill   Bill?   @relation(fields: [billId], references: [id])
@@ -429,13 +458,64 @@ model PatientVisit {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
+  // ===== RELATIONS =====
+  vitalSigns  VitalSigns[]  // Vital signs recorded during this visit
+  patientQueues PatientQueue[] // Patient queues for this visit
+  
   @@index([hospitalId])
   @@index([patientId])
   @@index([visitId])
   @@index([visitType])
   @@index([status])
   @@index([visitDate])
+  @@index([requiresIPDAdmission])
   @@map("patient_visits")
+}
+
+// ============== VITAL SIGNS ==============
+// Captured during OPD triage/entry by nursing staff
+// Records patient vital signs at the time of OPD visit
+model VitalSigns {
+  id              String @id @default(cuid())
+  
+  // Relations
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  patientId       String
+  patient         Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  visitId         String
+  patientVisit    PatientVisit @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  
+  // ===== VITAL MEASUREMENTS =====
+  height          Float?        // Centimeters (cm)
+  weight          Float?        // Kilograms (kg)
+  bmi             Float?        // Body Mass Index (auto-calculated: weight in kg / (height in m)^2)
+  
+  // Blood Pressure (mmHg)
+  bloodPressureSystolic   Int?  // e.g., 140
+  bloodPressureDiastolic  Int?  // e.g., 90
+  
+  pulseRate       Int?          // Beats per minute (bpm)
+  temperature     Float?        // Celsius or Fahrenheit (store unit in metadata if needed)
+  respiratoryRate Int?          // Breaths per minute (breaths/min)
+  oxygenSaturation Float?       // SpO₂ percentage (%)
+  
+  // ===== RECORDED INFO =====
+  recordedBy      String        // Employee/Nurse ID who recorded vitals
+  recordedByName  String?       // Name of staff member for audit
+  
+  // ===== TIMESTAMPS =====
+  recordedAt      DateTime @default(now())  // When vitals were actually recorded
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([visitId])
+  @@index([recordedAt])
+  @@map("vital_signs")
 }
 
 // ============== ATTENDANCE ==============
@@ -1430,9 +1510,16 @@ model PatientQueue {
   transferredTo   String?  // New queue ID if transferred
   transferReason  String?
   
+  // ===== IPD REQUIREMENT =====
+  requiresIPDAdmission Boolean @default(false) // Doctor marked this as requiring IPD
+  
   // ===== DIAGNOSTIC ORDER LINK =====
   diagnosticOrderId String?
   diagnosticOrder   DiagnosticOrder? @relation(fields: [diagnosticOrderId], references: [id])
+  
+  // ===== VISIT LINK =====
+  visitId         String?
+  visit           PatientVisit? @relation(fields: [visitId], references: [id])
   
   // ===== NOTES =====
   notes           String?
@@ -1457,6 +1544,7 @@ model PatientQueue {
   @@index([priority])
   @@index([joinedAt])
   @@index([position])
+  @@index([requiresIPDAdmission])
   @@map("patient_queues")
 }
 
@@ -1795,4 +1883,412 @@ model DiagnosticReport {
   @@index([isReleased])
   @@index([reportDate])
   @@map("diagnostic_reports")
+}
+
+// ============== IPD (IN-PATIENT DEPARTMENT) ==============
+// IPD Admission Queue/Request Management
+// Tracks patient admission requests from OPD to IPD workflow
+model IPDAdmissionRequest {
+  id                    String    @id @default(cuid())
+  
+  // Patient and visit references
+  patientId             String
+  patient               Patient   @relation("IPDAdmissionRequest", fields: [patientId], references: [id], onDelete: Cascade)
+  visitId               String?
+  
+  // Admission request details
+  admissionReason       String    // Why patient needs IPD admission
+  initialDiagnosis      String?
+  estimatedLOS          Int       @default(3) // Estimated length of stay in days
+  priority              String    @default("NORMAL") // URGENT, HIGH, NORMAL, LOW
+  medicalHistory        String?
+  allergies             String?
+  emergencyContact      String?
+  recommendedDepartment String?
+  notes                 String?
+  
+  // Bed allocation
+  allocatedBedId        String?
+  allocatedBed          IPDBed?   @relation("BedAllocation", fields: [allocatedBedId], references: [id])
+  
+  // Workflow status
+  status                String    @default("PENDING") // PENDING, APPROVED, ADMITTED, REJECTED
+  requestedBy           String    // Doctor ID who created request
+  requestedByUser       Employee? @relation("IPDRequestedBy", fields: [requestedBy], references: [id])
+  requestedAt           DateTime  @default(now())
+  
+  // Approval workflow
+  approvedBy            String?   // Bed Manager/Ward In-Charge ID
+  approvedByUser        Employee? @relation("IPDApprovedBy", fields: [approvedBy], references: [id])
+  approvedAt            DateTime?
+  
+  // Rejection workflow
+  rejectedBy            String?   // Who rejected
+  rejectedByUser        Employee? @relation("IPDRejectedBy", fields: [rejectedBy], references: [id])
+  rejectedAt            DateTime?
+  rejectionReason       String?
+  
+  // Link to actual IPD admission when created
+  admissionId           String?
+  admission             IPDAdmission? @relation("RequestToAdmission", fields: [admissionId], references: [id])
+  
+  // Hospital context
+  hospitalId            String
+  hospital              Hospital  @relation("IPDAdmissionRequest", fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([patientId])
+  @@index([status])
+  @@index([requestedAt])
+  @@index([hospitalId])
+  @@map("ipd_admission_requests")
+}
+
+// IPD Admission
+model IPDAdmission {
+  id                    String    @id @default(cuid())
+  
+  // Patient and basic info
+  patientId             String
+  patient               Patient   @relation("IPDAdmission", fields: [patientId], references: [id], onDelete: Cascade)
+  bedId                 String
+  bed                   IPDBed    @relation("BedAdmission", fields: [bedId], references: [id])
+  
+  // Admission details
+  wardName              String
+  roomNumber            String?
+  admissionReason       String
+  initialDiagnosis      String?
+  medicalHistory        String?
+  allergies             String?
+  emergencyContact      String?
+  admittingDoctorId     String
+  admittingDoctor       Employee? @relation("AdmittingDoctor", fields: [admittingDoctorId], references: [id])
+  departmentId          String?
+  
+  // Status and dates
+  status                String    @default("ACTIVE") // ACTIVE, DISCHARGED, TRANSFERRED
+  admissionDate         DateTime  @default(now())
+  admittedBy            String    // User ID who admitted
+  
+  // Related to admission request
+  admissionRequest      IPDAdmissionRequest? @relation("RequestToAdmission")
+  
+  // Hospital context
+  hospitalId            String
+  hospital              Hospital  @relation("IPDAdmission", fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Relations to other IPD data
+  clinicalNotes         IPDProgressNote[]
+  orders                IPDOrder[]
+  vitalSigns            IPDVitalSigns[]
+  transfers             IPDPatientMovement[]
+  discharge             IPDDischargeSummary?
+  consents              IPDConsent[]
+  alerts                IPDAlert[]
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([patientId])
+  @@index([status])
+  @@index([admissionDate])
+  @@index([hospitalId])
+  @@map("ipd_admissions")
+}
+
+// IPD Bed
+model IPDBed {
+  id                    String    @id @default(cuid())
+  
+  bedNumber             String
+  wardName              String
+  roomNumber            String?
+  status                String    @default("AVAILABLE") // AVAILABLE, OCCUPIED, MAINTENANCE
+  bedType               String?   // GENERAL, SEMI_PRIVATE, PRIVATE, ICU
+  
+  // Occupancy tracking
+  occupiedBy            String?   // Patient ID
+  occupiedDate          DateTime?
+  
+  // Maintenance
+  maintenanceStartDate  DateTime?
+  maintenanceEndDate    DateTime?
+  maintenanceReason     String?
+  
+  // Hospital context
+  hospitalId            String
+  hospital              Hospital  @relation("IPDBed", fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Relations
+  admissions            IPDAdmission[] @relation("BedAdmission")
+  allocationRequests    IPDAdmissionRequest[] @relation("BedAllocation")
+  movements             IPDPatientMovement[]
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([wardName])
+  @@index([status])
+  @@index([hospitalId])
+  @@map("ipd_beds")
+}
+
+// IPD Vital Signs
+model IPDVitalSigns {
+  id                    String    @id @default(cuid())
+  
+  admissionId           String
+  admission             IPDAdmission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  patientId             String
+  patient               Patient   @relation("IPDVitalSigns", fields: [patientId], references: [id], onDelete: Cascade)
+  
+  // Vital measurements
+  temperature           Float?
+  systolicBP            Float?
+  diastolicBP           Float?
+  pulse                 Int?
+  respiratoryRate       Int?
+  oxygenSaturation      Float?
+  bloodGlucose          Float?
+  weight                Float?
+  
+  // Recording info
+  recordedBy            String    // Nurse ID
+  recordedAt            DateTime  @default(now())
+  
+  // Abnormality flag
+  hasAbnormality        Boolean   @default(false)
+  abnormalityNotes      String?
+  
+  // Alert generation
+  alertId               String?
+  alert                 IPDAlert? @relation(fields: [alertId], references: [id])
+  
+  hospitalId            String
+  hospital              Hospital  @relation("IPDVitalSigns", fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([admissionId])
+  @@index([patientId])
+  @@index([recordedAt])
+  @@map("ipd_vital_signs")
+}
+
+// IPD Progress Note
+model IPDProgressNote {
+  id                    String    @id @default(cuid())
+  
+  admissionId           String
+  admission             IPDAdmission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  patientId             String
+  
+  // Note type and content
+  noteType              String    // PROGRESS, NURSING, ASSESSMENT, DISCHARGE_SUMMARY
+  noteContent           String
+  
+  // Author information
+  createdBy             String    // User ID
+  createdByUser         Employee? @relation(fields: [createdBy], references: [id])
+  
+  // Editing
+  editedBy              String?
+  editedAt              DateTime?
+  editHistory           Json?     // Track all edits
+  
+  // Status
+  isDraft               Boolean   @default(false)
+  
+  hospitalId            String
+  hospital              Hospital  @relation("IPDProgressNote", fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([admissionId])
+  @@index([patientId])
+  @@index([noteType])
+  @@map("ipd_progress_notes")
+}
+
+// IPD Clinical Orders
+model IPDOrder {
+  id                    String    @id @default(cuid())
+  
+  admissionId           String
+  admission             IPDAdmission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  patientId             String
+  
+  // Order details
+  orderType             String    // LAB, MEDICATION, PROCEDURE, IMAGING
+  orderDescription      String
+  status                String    @default("PENDING") // PENDING, ACCEPTED, IN_PROGRESS, COMPLETED
+  
+  // Order specifics (JSON for flexibility)
+  orderDetails          Json?
+  resultDetails         Json?
+  
+  // Ordering physician
+  orderedBy             String
+  orderedByUser         Employee? @relation(fields: [orderedBy], references: [id])
+  
+  // Scheduled date
+  scheduledDate         DateTime?
+  completionDate        DateTime?
+  
+  hospitalId            String
+  hospital              Hospital  @relation("IPDOrder", fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([admissionId])
+  @@index([status])
+  @@index([orderType])
+  @@map("ipd_orders")
+}
+
+// IPD Alerts
+model IPDAlert {
+  id                    String    @id @default(cuid())
+  
+  admissionId           String
+  admission             IPDAdmission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  patientId             String
+  
+  // Alert details
+  alertType             String    // VITAL, LAB, MEDICATION, ALLERGY, INFECTION, FALL_RISK
+  severity              String    // CRITICAL, HIGH, MEDIUM, LOW
+  alertMessage          String
+  triggerData           Json?     // What triggered the alert
+  
+  // Status
+  status                String    @default("PENDING") // PENDING, ACKNOWLEDGED, RESOLVED
+  acknowledgedBy        String?
+  acknowledgedAt        DateTime?
+  
+  // Vital sign reference
+  vitalSignId           String?
+  vitalSign             IPDVitalSigns? @relation(fields: [vitalSignId], references: [id])
+  
+  // Alert routing
+  assignedTo            String?   // User ID
+  assignedToUser        Employee? @relation(fields: [assignedTo], references: [id])
+  
+  hospitalId            String
+  hospital              Hospital  @relation("IPDAlert", fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([admissionId])
+  @@index([status])
+  @@index([severity])
+  @@map("ipd_alerts")
+}
+
+// IPD Consent
+model IPDConsent {
+  id                    String    @id @default(cuid())
+  
+  admissionId           String
+  admission             IPDAdmission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  patientId             String
+  
+  // Consent type
+  consentType           String    // INFORMED, PROCEDURE, SURGERY, TREATMENT, ANESTHESIA
+  consentDescription    String
+  
+  // Status and signatures
+  status                String    @default("PENDING") // PENDING, SIGNED, WITHDRAWN
+  signedAt              DateTime?
+  signedByPatient       Boolean   @default(false)
+  patientSignature      String?   // Base64 or URL
+  
+  // Guardian consent
+  guardianName          String?
+  guardianSignature     String?
+  
+  // Compliance
+  consentFormUrl        String?   // PDF or document URL
+  
+  hospitalId            String
+  hospital              Hospital  @relation("IPDConsent", fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([admissionId])
+  @@index([status])
+  @@map("ipd_consents")
+}
+
+// IPD Patient Movement
+model IPDPatientMovement {
+  id                    String    @id @default(cuid())
+  
+  admissionId           String?
+  patientId             String
+  patient               Patient   @relation("IPDPatientMovement", fields: [patientId], references: [id], onDelete: Cascade)
+  
+  // Movement tracking
+  movementType          String    // ADMISSION, TRANSFER, ICU, OT, DISCHARGE
+  fromBedId             String?
+  toBedId               String?
+  toBed                 IPDBed    @relation(fields: [toBedId], references: [id])
+  
+  // Details
+  reason                String?
+  dischargeSummaryId    String?
+  
+  // Status
+  transferDate          DateTime  @default(now())
+  movedBy               String    // User ID
+  movedByUser           Employee? @relation(fields: [movedBy], references: [id])
+  
+  hospitalId            String
+  hospital              Hospital  @relation("IPDPatientMovement", fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([patientId])
+  @@index([movementType])
+  @@index([transferDate])
+  @@map("ipd_patient_movements")
+}
+
+// IPD Discharge Summary
+model IPDDischargeSummary {
+  id                    String    @id @default(cuid())
+  
+  admissionId           String    @unique
+  admission             IPDAdmission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  patientId             String
+  
+  // Summary details
+  finalDiagnosis        String
+  treatmentSummary      String
+  medications           Json?     // Discharge medications
+  followUpInstructions  String?
+  restrictionsAdvice    String?
+  
+  // Discharge info
+  dischargeDate         DateTime  @default(now())
+  dischargeType         String    // HOME, AMA, TRANSFERRED, EXPIRED
+  dischargingDoctor     String
+  
+  hospitalId            String
+  hospital              Hospital  @relation("IPDDischargeSummary", fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([patientId])
+  @@index([dischargeDate])
+  @@map("ipd_discharge_summaries")
 }

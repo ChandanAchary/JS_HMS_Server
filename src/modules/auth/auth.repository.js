@@ -13,6 +13,21 @@ export class AuthRepository {
   }
 
   /**
+   * Find the latest join request by email (used as fallback for missing appliedRole/specialization)
+   */
+  async findLatestJoinRequestByEmail(email) {
+    try {
+      return await this.prisma.joinRequest.findFirst({
+        where: { email: email.toLowerCase() },
+        orderBy: { submittedAt: 'desc' },
+      });
+    } catch (error) {
+      logger.warn('Error fetching join request fallback:', error);
+      return null;
+    }
+  }
+
+  /**
    * Find user by email or phone (searches across all user types)
    */
   async findUserByEmailOrPhone(emailOrPhone) {

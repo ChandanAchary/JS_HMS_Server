@@ -111,18 +111,22 @@ export class DoctorService {
     // Update login status
     await this.repository.updateLoginStatus(doctor.id, true);
 
-    // Compute permissions
-    const basePerms = getPermissionsForRole('DOCTOR');
+    // CRITICAL: Doctors use 'DOCTOR' role; permissions based on specialization if needed
+    const tokenRole = doctor.role || 'DOCTOR';
+
+    // Compute permissions (base + any delegated)
+    const basePerms = getPermissionsForRole(tokenRole);
     const delegated = Array.isArray(doctor.delegatedPermissions) ? doctor.delegatedPermissions : [];
     const permissions = Array.from(new Set([...(basePerms || []), ...delegated]));
 
-    // Generate token
+    // Generate token with specialization metadata for frontend
     const token = jwt.sign(
       { 
         id: doctor.id, 
-        role: 'DOCTOR', 
+        role: tokenRole, 
         hospitalId: doctor.hospitalId, 
-        permissions 
+        permissions,
+        specialization: doctor.specialization || null
       },
       process.env.JWT_SECRET,
       { expiresIn: '1d' }

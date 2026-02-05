@@ -5,6 +5,7 @@
 
 import 'dotenv/config';
 import { connectDB, getPrisma } from './src/core/database/tenantDb.js';
+import { tenantContext } from './src/core/context/tenantContext.js';
 import config from './src/core/config/environment.js';
 import createApp from './src/app.js';
 import logger from './src/core/utils/logger.js';
@@ -21,6 +22,11 @@ async function startServer() {
     logger.info(`[Server] Connecting to database in ${NODE_ENV} mode...`);
     await connectDB();
     logger.info('[Server] ✓ Database connected');
+
+    // Initialize TenantContext (single-tenant hospital context)
+    logger.info('[Server] Initializing TenantContext...');
+    await tenantContext.initialize();
+    logger.info('[Server] ✓ TenantContext initialized');
 
     // Get Prisma client
     const prisma = getPrisma();

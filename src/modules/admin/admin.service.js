@@ -1430,7 +1430,7 @@ export class AdminService {
     // Prevent deletion of default fields
     const defaultFieldNames = [
       'profilePhoto', 'fullName', 'dateOfBirth', 'age', 'email', 'mobileNumber',
-      'qualification', 'specialization', 'medicalLicenseNumber', 'roleAppliedFor'
+      'qualification', 'specialization', 'medicalLicenseNumber', 'roleApplied'
     ];
 
     if (defaultFieldNames.includes(field.fieldName)) {

@@ -225,7 +225,7 @@ export class DepartmentService {
           patient: {
             select: {
               id: true,
-              patientCode: true,
+              patientId: true,
               name: true,
               age: true,
               gender: true

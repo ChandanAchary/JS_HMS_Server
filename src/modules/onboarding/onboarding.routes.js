@@ -41,6 +41,7 @@ router.use('/admin', protect, authorize('ADMIN'));
 // Join requests management
 router.get('/admin/join-requests', onboardingController.getJoinRequests);
 router.get('/admin/join-requests/:id', onboardingController.getJoinRequest);
+router.put('/admin/join-requests/:id', onboardingController.updateJoinRequest);
 router.post('/admin/join-requests/:id/send-invite', onboardingController.sendRegistrationInviteToRequest);
 router.post('/admin/join-requests/:id/approve', onboardingController.approveJoinRequest);
 router.post('/admin/join-requests/:id/reject', onboardingController.rejectJoinRequest);

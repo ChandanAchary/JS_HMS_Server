@@ -12,6 +12,7 @@ import {
 } from './onboarding.repository.js';
 import { 
   formatJoinRequest,
+  formatJoinRequestDetails,
   formatApplicationStatus,
   formatTokenValidation,
   formatVerificationsQueue,
@@ -39,8 +40,7 @@ import {
   sendRejectionNotice, 
   sendEmailVerification,
   sendRegistrationConfirmation
-} from '../../services/email.service.js';
-
+} from '../../services/email.service.js';import { EMPLOYEE_ROLES } from '../../constants/roles.js';
 export class OnboardingService {
   constructor(prisma) {
     this.prisma = prisma;
@@ -157,6 +157,8 @@ export class OnboardingService {
       name: parsed.name,
       email: parsed.email,
       role: parsed.role,
+      appliedRole: parsed.appliedRole, // Now captured for EMPLOYEE role
+      specialization: parsed.specialization, // Now captured for DOCTOR role
       hospitalId: parsed.hospitalId,
       status: 'PENDING'
     });
@@ -239,8 +241,8 @@ export class OnboardingService {
       throw new ForbiddenError('Access denied');
     }
 
-    // Return full join request so admin can view the filled form
-    return { joinRequest };
+    // Return role-specific formatted join request
+    return { joinRequest: formatJoinRequestDetails(joinRequest) };
   }
 
   /**
@@ -337,8 +339,9 @@ export class OnboardingService {
 
   /**
    * Approve join request
+   * @param appliedRoleOverride - Optional: provide appliedRole if legacy request is missing it
    */
-  async approveJoinRequest(joinRequestId, adminId, hospitalId) {
+  async approveJoinRequest(joinRequestId, adminId, hospitalId, appliedRoleOverride = null) {
     const joinRequest = await this.joinRequestRepo.findById(joinRequestId);
     if (!joinRequest) {
       throw new NotFoundError('Join request not found');
@@ -422,13 +425,65 @@ export class OnboardingService {
       throw new ConflictError('Employee already exists with this phone number');
     }
 
-    // Validate that appliedRole is set - cannot use generic EMPLOYEE role
-    if (!joinRequest.appliedRole) {
+    // Validate that appliedRole is set - allow override for legacy requests
+    // First check if appliedRole exists at root level
+    let effectiveAppliedRole = joinRequest.appliedRole;
+    
+    // If not, try to extract from formData (for legacy requests or recent registrations)
+    if (!effectiveAppliedRole && joinRequest.formData) {
+      const formDataObj = typeof joinRequest.formData === 'string' 
+        ? JSON.parse(joinRequest.formData) 
+        : joinRequest.formData;
+      
+      // Check both new and old field names in formData
+      effectiveAppliedRole = formDataObj?.roleApplied || 
+                             formDataObj?.roleAppliedFor || 
+                             formDataObj?.appliedRole || 
+                             formDataObj?.role_applied_for || null;
+      
+      if (effectiveAppliedRole) {
+        console.log('[DEBUG] Extracted appliedRole from formData:', effectiveAppliedRole);
+      }
+    }
+    
+    // If not, try to use the admin-provided override from request body
+    if (!effectiveAppliedRole && appliedRoleOverride) {
+      effectiveAppliedRole = appliedRoleOverride;
+    }
+    
+    // If still no appliedRole, check if one exists in specialization field (legacy compatibility)
+    if (!effectiveAppliedRole && joinRequest.role === 'EMPLOYEE') {
+      // For legacy records where appliedRole might not be set, check common patterns
+      if (joinRequest.specialization && EMPLOYEE_ROLES.includes(String(joinRequest.specialization).toUpperCase())) {
+        effectiveAppliedRole = joinRequest.specialization;
+      }
+    }
+    
+    // Final validation - appliedRole is absolutely required for EMPLOYEE approval
+    if (!effectiveAppliedRole) {
       throw new ValidationError(
-        `Cannot approve employee: Applied role is missing. ` +
-        `Employee must apply for a specific role (e.g., PATHOLOGY, XRAY, NURSE_OPD, BILLING_ENTRY, etc.), ` +
-        `not a generic EMPLOYEE position.`
+        `Cannot approve employee: Applied role is missing from join request. ` +
+        `Please provide appliedRole in the approval request body.\n\n` +
+        `Example: POST /api/onboarding/admin/join-requests/${joinRequestId}/approve\n` +
+        `Body: { "appliedRole": "NURSE" }\n\n` +
+        `Valid values: ${EMPLOYEE_ROLES.join(', ')}\n\n` +
+        `Alternatively, update the join request first using:\n` +
+        `PUT /api/onboarding/admin/join-requests/${joinRequestId}\n` +
+        `Body: { "appliedRole": "NURSE" }`
       );
+    }
+
+    // Validate that the provided appliedRole is valid
+    if (!EMPLOYEE_ROLES.includes(String(effectiveAppliedRole).toUpperCase())) {
+      throw new ValidationError(
+        `Invalid applied role: ${effectiveAppliedRole}. Must be one of: ${EMPLOYEE_ROLES.join(', ')}`
+      );
+    }
+
+    // Normalize legacy role names and common variations
+    let normalizedAppliedRole = String(effectiveAppliedRole).toUpperCase().trim();
+    if (normalizedAppliedRole === 'NURSE_OPD' || normalizedAppliedRole === 'NURSE_IPD') {
+      normalizedAppliedRole = 'NURSE';
     }
 
     const employee = await this.prisma.employee.create({
@@ -437,7 +492,7 @@ export class OnboardingService {
         email: joinRequest.email,
         phone: joinRequest.phone || '',
         hospitalId: joinRequest.hospitalId,
-        role: joinRequest.appliedRole,
+        role: normalizedAppliedRole,
         qualification: joinRequest.qualifications?.length ? joinRequest.qualifications[0] : '',
         profilePic: joinRequest.profilePic || '',
         password: hashedPassword,
@@ -448,17 +503,70 @@ export class OnboardingService {
       }
     });
 
+    // Update join request with approval details AND save the appliedRole
     await this.joinRequestRepo.update(joinRequest.id, {
       status: 'APPROVED',
       approvedAt: new Date(),
       approvedBy: adminId,
-      createdUserId: employee.id
+      createdUserId: employee.id,
+      appliedRole: normalizedAppliedRole // Save the resolved appliedRole to the root level
     });
 
     const loginUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/employee/login`;
     await sendApprovalWithCredentials(employee.email, employee.name, 'EMPLOYEE', loginUrl, defaultPassword);
 
     return { message: 'Employee approved and account created', employeeId: employee.id };
+  }
+
+  /**
+   * Update join request (admin can fix missing fields before approval)
+   */
+  async updateJoinRequest(joinRequestId, data, hospitalId) {
+    const joinRequest = await this.joinRequestRepo.findById(joinRequestId);
+    if (!joinRequest) {
+      throw new NotFoundError('Join request not found');
+    }
+
+    if (String(joinRequest.hospitalId) !== String(hospitalId)) {
+      throw new ForbiddenError('Access denied');
+    }
+
+    // Only allow updates on pending/form-submitted requests
+    if (!['PENDING', 'FORM_SUBMITTED'].includes(joinRequest.status)) {
+      throw new ValidationError(
+        `Cannot update request with status '${joinRequest.status}'. ` +
+        `Only PENDING and FORM_SUBMITTED requests can be updated.`
+      );
+    }
+
+    // If updating appliedRole, validate it
+    if (data.appliedRole) {
+      const normalized = String(data.appliedRole).toUpperCase().trim();
+      if (!EMPLOYEE_ROLES.includes(normalized) && 
+          normalized !== 'NURSE_OPD' && normalized !== 'NURSE_IPD') {
+        throw new ValidationError(
+          `Invalid appliedRole. Must be one of: ${EMPLOYEE_ROLES.join(', ')}`
+        );
+      }
+    }
+
+    const updateData = {};
+    if (data.appliedRole !== undefined) updateData.appliedRole = data.appliedRole;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.qualifications !== undefined) updateData.qualifications = data.qualifications;
+    if (data.specialization !== undefined) updateData.specialization = data.specialization;
+    if (data.licenseNumber !== undefined) updateData.licenseNumber = data.licenseNumber;
+    if (data.additionalInfo !== undefined) updateData.additionalInfo = data.additionalInfo;
+
+    if (Object.keys(updateData).length === 0) {
+      throw new ValidationError('No valid fields to update');
+    }
+
+    const updated = await this.joinRequestRepo.update(joinRequestId, updateData);
+    return {
+      message: 'Join request updated successfully',
+      joinRequest: updated
+    };
   }
 
   // ==================== TOKEN REGISTRATION ====================
@@ -578,7 +686,7 @@ export class OnboardingService {
     if (!data.role || data.role === 'EMPLOYEE') {
       throw new ValidationError(
         `Invalid role for employee registration. ` +
-        `Employee must register with a specific role (e.g., PATHOLOGY, XRAY, NURSE_OPD, BILLING_ENTRY, etc.), ` +
+        `Employee must register with a specific role (e.g., PATHOLOGY, XRAY, NURSE, BILLING_ENTRY, etc.), ` +
         `not the generic EMPLOYEE role.`
       );
     }

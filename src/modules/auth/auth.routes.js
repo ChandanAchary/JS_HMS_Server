@@ -5,7 +5,7 @@
 
 import express from 'express';
 import { AuthController } from './auth.controller.js';
-import { protect } from '../../core/middleware/auth.middleware.js';
+import { protect, debugUserContext } from '../../core/middleware/auth.middleware.js';
 
 export function createAuthRoutes(prisma) {
   const router = express.Router();
@@ -33,6 +33,9 @@ export function createAuthRoutes(prisma) {
   );
   router.get('/me', protect, (req, res, next) => controller.getProfile(req, res, next));
   router.post('/refresh', protect, (req, res, next) => controller.refreshToken(req, res, next));
+  
+  // Debug endpoint - shows user context with permissions (staging/dev only)
+  router.get('/debug', protect, debugUserContext);
 
   return router;
 }

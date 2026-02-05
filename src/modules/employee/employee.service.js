@@ -112,16 +112,20 @@ export class EmployeeService {
     // Update login status
     await this.repository.updateLoginStatus(employee.id, true);
 
-    // Compute permissions
-    const basePerms = getPermissionsForRole('EMPLOYEE');
+    // CRITICAL: Use actual employee.role (e.g., PATHOLOGY, OPD_ASSISTANT) not hardcoded 'EMPLOYEE'
+    // Fallback to 'EMPLOYEE' only if role is missing (legacy records)
+    const tokenRole = employee.role || 'EMPLOYEE';
+
+    // Compute permissions based on actual role
+    const basePerms = getPermissionsForRole(tokenRole);
     const delegated = Array.isArray(employee.delegatedPermissions) ? employee.delegatedPermissions : [];
     const permissions = Array.from(new Set([...(basePerms || []), ...delegated]));
 
-    // Generate token
+    // Generate token with actual role
     const token = jwt.sign(
       { 
         id: employee.id, 
-        role: 'EMPLOYEE', 
+        role: tokenRole,  // Use actual employee role from database
         hospitalId: employee.hospitalId, 
         permissions 
       },

@@ -165,6 +165,12 @@ export class PublicRegistrationService {
     // Calculate age if DOB is provided
     const age = fields.dob ? this._calculateAge(fields.dob) : null;
 
+    // Extract appliedRole from form data (for EMPLOYEE role) - check both new and old field names
+    const appliedRole = formData.roleApplied || formData.roleAppliedFor || formData.role_applied_for || fields.appliedRole || null;
+    
+    // Log for debugging
+    console.log('[PublicRegistration] submitApplication - appliedRole:', appliedRole, 'from formData:', { roleApplied: formData.roleApplied, roleAppliedFor: formData.roleAppliedFor });
+
     // Prepare join request data
     const joinRequestData = {
       hospitalId,
@@ -172,15 +178,21 @@ export class PublicRegistrationService {
       name: fields.name,
       phone: fields.phone,
       formData: {
-        ...formData,
-        profilePhotoUrl,
-        age
+        ...formData
+        // NOTE: appliedRole is saved at root level, not in formData, to avoid duplication
+        // Remove appliedRole from formData copy if it exists
       },
       role: validatedRole,
+      appliedRole: validatedRole === 'EMPLOYEE' ? appliedRole : null, // Save appliedRole for EMPLOYEE at root level
       status: 'FORM_SUBMITTED',
       submittedAt: new Date(),
       notes: `Applied for ${validatedRole} position via public registration`
     };
+    
+    // Clean up formData to remove appliedRole and avoid duplication
+    delete joinRequestData.formData.appliedRole;
+    delete joinRequestData.formData.roleApplied;
+    delete joinRequestData.formData.roleAppliedFor;
 
     // Add role-specific fields
     if (validatedRole === 'DOCTOR') {
@@ -291,17 +303,32 @@ export class PublicRegistrationService {
     const profilePhotoUrl = extractProfilePhotoUrl(profilePhotoFile);
     const formFields = extractFormFields(formData, template);
 
-    // Create join request
-    const joinRequest = await this.joinRequestRepository.create({
+    // Extract appliedRole from form data (for EMPLOYEE role) - check both new and old field names
+    const appliedRole = formData.roleApplied || formData.roleAppliedFor || formData.role_applied_for || formData.appliedRole || null;
+    
+    // Log for debugging
+    console.log('[PublicRegistration] Creating join request with appliedRole:', appliedRole, 'from formData:', { roleApplied: formData.roleApplied, roleAppliedFor: formData.roleAppliedFor });
+
+    // Create join request - MUST save appliedRole at root level for EMPLOYEE approval to work
+    const createData = {
       hospitalId: hospital.id,
       name: formData.fullName,
       email: formData.email.toLowerCase(),
       phone: formData.mobileNumber,
       role: validatedRole,
-      formData: formFields,
+      appliedRole: validatedRole === 'EMPLOYEE' ? appliedRole : null, // Save appliedRole for EMPLOYEE at root level
+      specialization: validatedRole === 'DOCTOR' ? (formData.specialization || formData.Specialization) : null,
+      formData: formFields, // formFields already has appliedRole removed by extractFormFields
       profilePic: profilePhotoUrl,
       status: 'PENDING'
-    });
+    };
+    
+    // Clean up formData to remove appliedRole and avoid duplication
+    delete createData.formData.appliedRole;
+    delete createData.formData.roleApplied;
+    delete createData.formData.roleAppliedFor;
+    
+    const joinRequest = await this.joinRequestRepository.create(createData);
 
     return joinRequest;
   }

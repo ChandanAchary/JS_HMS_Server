@@ -39,6 +39,7 @@ export {
 // DTOs
 export {
   formatJoinRequest,
+  formatJoinRequestDetails,
   formatApplicationStatus,
   formatTokenValidation,
   formatVerificationItem,

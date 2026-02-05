@@ -56,6 +56,13 @@ export function initializeTenantPrisma() {
     ],
   });
 
+  // Configure connection pool settings
+  // Neon pooler has a default limit of 25 connections per endpoint
+  // We use a conservative limit to avoid exhaustion
+  if (dbUrl.includes('-pooler.neon.tech')) {
+    logger.info('[Tenant DB] Using Neon pooler endpoint - connection pool configured');
+  }
+
   // Log queries in development
   if (process.env.NODE_ENV === 'development') {
     tenantPrismaInstance.$on('query', (e) => {

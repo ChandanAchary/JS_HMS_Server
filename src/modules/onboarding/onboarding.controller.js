@@ -171,13 +171,36 @@ export const rejectJoinRequest = async (req, res, next) => {
 /**
  * Approve join request (admin)
  * POST /api/v1/onboarding/admin/join-requests/:id/approve
+ * Optional: pass { appliedRole } in body for legacy requests missing appliedRole
  */
 export const approveJoinRequest = async (req, res, next) => {
   try {
     const service = new OnboardingService(req.tenantPrisma);
     const result = await service.approveJoinRequest(
-      req.params.id, 
-      req.user.id, 
+      req.params.id,
+      req.user.id,
+      req.user.hospitalId,
+      req.body?.appliedRole // Allow admin to supply appliedRole for legacy requests
+    );
+    
+    return res.status(HttpStatus.OK).json(
+      ApiResponse.success(result, result.message)
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update join request (admin)
+ * PUT /api/v1/onboarding/admin/join-requests/:id
+ */
+export const updateJoinRequest = async (req, res, next) => {
+  try {
+    const service = new OnboardingService(req.tenantPrisma);
+    const result = await service.updateJoinRequest(
+      req.params.id,
+      req.body,
       req.user.hospitalId
     );
     

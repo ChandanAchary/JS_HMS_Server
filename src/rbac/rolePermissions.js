@@ -1,30 +1,476 @@
-import { PERMISSIONS } from "./permissions.js";
+/**
+ * Central Role-Based Access Control (RBAC) Authority
+ * 
+ * Single source of truth for role → permissions mapping.
+ * 
+ * KEY PRINCIPLES:
+ * 1. Permission names are semantic: VIEW_PATIENTS, MANAGE_EMPLOYEES, etc.
+ * 2. SUPER_ADMIN has all permissions
+ * 3. Tokens include `permissions` array; RBAC checks use permissions, not roles
+ * 4. Fallback to this mapping if token missing permissions
+ * 5. All new code should use permission checks, not role string checks
+ * 
+ * MIGRATION: Old role-based checks (authorize('DOCTOR')) are deprecated in favor of
+ *            permission checks (authorizePermission('MANAGE_PATIENTS')). See rbac.middleware.js
+ */
 
-// Role -> permissions mapping
-// WHY: Define baseline permissions for each role. Tokens may include a `permissions`
-// array to short-circuit checks; otherwise permission middleware falls back to this map.
+/**
+ * Consolidated permission definitions
+ * Unified from multiple sources to ensure consistency across:
+ * - Clinical operations (OPD, Diagnostics)
+ * - Billing & Reports
+ * - Employee management
+ * - General dashboard/profile
+ */
+export const PERMISSIONS = {
+  // === ADMIN & SYSTEM ===
+  ADMINISTER_TENANT: 'ADMINISTER_TENANT',
+  ADMINISTER_SYSTEM: 'ADMINISTER_SYSTEM',
+  
+  // === EMPLOYEE MANAGEMENT ===
+  MANAGE_EMPLOYEE: 'MANAGE_EMPLOYEE',
+  VIEW_EMPLOYEES: 'VIEW_EMPLOYEES',
+  INVITE_USER: 'INVITE_USER',
+  
+  // === PATIENT & CLINICAL ===
+  MANAGE_PATIENTS: 'MANAGE_PATIENTS',
+  VIEW_PATIENTS: 'VIEW_PATIENTS',
+  RECORD_VITALS: 'RECORD_VITALS',        // Nurses, OPD assistants
+  PROVIDE_CONSULTATION: 'PROVIDE_CONSULTATION', // Doctors
+  
+  // === DIAGNOSTICS & LAB ===
+  GENERATE_REPORT: 'GENERATE_REPORT',    // Lab tech, pathologists
+  VIEW_REPORTS: 'VIEW_REPORTS',
+  MANAGE_DIAGNOSTICS: 'MANAGE_DIAGNOSTICS',
+  APPROVE_QC: 'APPROVE_QC',              // QC approval for lab results
+  REVIEW_PATHOLOGY: 'REVIEW_PATHOLOGY',  // Pathologist review
+  
+  // === OPD OPERATIONS ===
+  MANAGE_QUEUE: 'MANAGE_QUEUE',          // Queue coordination
+  ACCESS_ALL_QUEUES: 'ACCESS_ALL_QUEUES', // Admin override
+  
+  // === BILLING ===
+  BILLING_ACCESS: 'BILLING_ACCESS',
+  MANAGE_BILLING: 'MANAGE_BILLING',
+  MANAGE_SUBSCRIPTIONS: 'MANAGE_SUBSCRIPTIONS',
+  
+  // === REPORTS ===
+  PRINT_REPORT: 'PRINT_REPORT',
+  DISPATCH_REPORT: 'DISPATCH_REPORT',
+  
+  // === PROFILE ===
+  VIEW_PROFILE: 'VIEW_PROFILE',
+  VIEW_DASHBOARD: 'VIEW_DASHBOARD',
+  
+  // === ATTENDANCE ===
+  VIEW_ATTENDANCE: 'VIEW_ATTENDANCE',
+  MARK_ATTENDANCE: 'MARK_ATTENDANCE',
+  
+  // === PAYROLL ===
+  VIEW_PAYROLL: 'VIEW_PAYROLL',
+  MANAGE_PAYROLL: 'MANAGE_PAYROLL',
+  
+  // === IPD (IN-PATIENT DEPARTMENT) ===
+  // Admission & Bed Management
+  IPD_ADMIT_PATIENT: 'IPD_ADMIT_PATIENT',           // Receptionist, IPD Admin
+  IPD_VIEW_PATIENT: 'IPD_VIEW_PATIENT',             // All IPD staff
+  IPD_EDIT_PATIENT: 'IPD_EDIT_PATIENT',             // Doctor, IPD Admin
+  IPD_MANAGE_BEDS: 'IPD_MANAGE_BEDS',               // IPD Admin, Receptionist
+  IPD_VIEW_BEDS: 'IPD_VIEW_BEDS',                   // All IPD staff
+  
+  // Clinical Management
+  IPD_WRITE_NOTES: 'IPD_WRITE_NOTES',               // Doctor, Nurse
+  IPD_VIEW_NOTES: 'IPD_VIEW_NOTES',                 // All IPD staff
+  IPD_MANAGE_ORDERS: 'IPD_MANAGE_ORDERS',           // Doctor, IPD Admin
+  IPD_VIEW_ORDERS: 'IPD_VIEW_ORDERS',               // All IPD staff
+  IPD_MANAGE_MEDICATIONS: 'IPD_MANAGE_MEDICATIONS', // Nurse, Pharmacy
+  IPD_VIEW_MAR: 'IPD_VIEW_MAR',                     // Nurse, Doctor, IPD Admin (Medication Admin Record)
+  
+  // Care Management
+  IPD_CREATE_CARE_PLAN: 'IPD_CREATE_CARE_PLAN',     // Doctor, IPD Admin
+  IPD_VIEW_CARE_PLAN: 'IPD_VIEW_CARE_PLAN',         // All IPD staff
+  IPD_MANAGE_PROCEDURES: 'IPD_MANAGE_PROCEDURES',   // Doctor, IPD Admin
+  
+  // Patient Movement
+  IPD_TRANSFER_PATIENT: 'IPD_TRANSFER_PATIENT',     // Doctor, IPD Admin, Receptionist
+  IPD_VIEW_TRANSFERS: 'IPD_VIEW_TRANSFERS',         // All IPD staff
+  
+  // Discharge Management
+  IPD_DISCHARGE_PATIENT: 'IPD_DISCHARGE_PATIENT',   // Doctor, IPD Admin
+  IPD_VIEW_DISCHARGE: 'IPD_VIEW_DISCHARGE',         // All IPD staff
+  IPD_PRINT_DISCHARGE_SUMMARY: 'IPD_PRINT_DISCHARGE_SUMMARY', // Doctor, Receptionist
+  
+  // Alerts & Compliance
+  IPD_MANAGE_ALERTS: 'IPD_MANAGE_ALERTS',           // Nurse, Doctor, IPD Admin
+  IPD_VIEW_ALERTS: 'IPD_VIEW_ALERTS',               // All IPD staff
+  IPD_VIEW_AUDIT_LOG: 'IPD_VIEW_AUDIT_LOG',         // IPD Admin
+  
+  // Consent & Documentation
+  IPD_MANAGE_CONSENT: 'IPD_MANAGE_CONSENT',         // Receptionist, IPD Admin
+  IPD_VIEW_CONSENT: 'IPD_VIEW_CONSENT',             // All IPD staff
+  
+  // IPD-Specific Billing (integrated with billing module)
+  IPD_VIEW_BILLING: 'IPD_VIEW_BILLING',             // Billing staff, IPD Admin
+  IPD_MANAGE_CHARGES: 'IPD_MANAGE_CHARGES',         // Billing staff, IPD Admin
+};
+
+/**
+ * Role-to-permissions mapping
+ * 
+ * Structure:
+ * - System roles: SUPER_ADMIN, ADMIN
+ * - Hospital roles: TENANT_ADMIN, HR_MANAGER
+ * - Clinical roles: DOCTOR, NURSE, OPD_ASSISTANT, OPD_COORDINATOR, OPD_MANAGER
+ * - Diagnostic roles: PATHOLOGY, LAB_TECHNICIAN, XRAY, CT_SCAN, MRI, ULTRASOUND, ECG, ENDOSCOPY
+ * - Billing roles: BILLING_ENTRY, BILLING_EXIT
+ * - Generic: EMPLOYEE, RECEPTIONIST
+ */
 export const ROLE_PERMISSIONS = {
-  SUPER_ADMIN: Object.values(PERMISSIONS), // full access across system
-  ADMIN: Object.values(PERMISSIONS), // legacy ADMIN role has full access within its hospital
+  // System roles (unrestricted)
+  SUPER_ADMIN: Object.values(PERMISSIONS),
+  ADMIN: Object.values(PERMISSIONS),
+  
+  // Hospital management
   TENANT_ADMIN: [
     PERMISSIONS.ADMINISTER_TENANT,
     PERMISSIONS.MANAGE_EMPLOYEE,
+    PERMISSIONS.VIEW_EMPLOYEES,
     PERMISSIONS.MANAGE_SUBSCRIPTIONS,
     PERMISSIONS.MANAGE_BILLING,
     PERMISSIONS.VIEW_REPORTS,
     PERMISSIONS.PRINT_REPORT,
     PERMISSIONS.DISPATCH_REPORT,
     PERMISSIONS.INVITE_USER,
+    PERMISSIONS.VIEW_DASHBOARD,
   ],
-  HR_: [PERMISSIONS.INVITE_USER, PERMISSIONS.MANAGE_EMPLOYEE],
-  DOCTOR: [PERMISSIONS.GENERATE_REPORT, PERMISSIONS.VIEW_REPORTS, PERMISSIONS.MANAGE_PATIENTS],
-  LAB_TECH: [PERMISSIONS.GENERATE_REPORT, PERMISSIONS.VIEW_REPORTS],
-  DISPATCH: [PERMISSIONS.VIEW_REPORTS, PERMISSIONS.DISPATCH_REPORT],
-  EMPLOYEE: [PERMISSIONS.VIEW_REPORTS],
+  
+  HR_MANAGER: [
+    PERMISSIONS.INVITE_USER,
+    PERMISSIONS.MANAGE_EMPLOYEE,
+    PERMISSIONS.VIEW_EMPLOYEES,
+    PERMISSIONS.VIEW_ATTENDANCE,
+    PERMISSIONS.MANAGE_PAYROLL,
+    PERMISSIONS.VIEW_PAYROLL,
+  ],
+  
+  // Clinical: Doctors
+  DOCTOR: [
+    PERMISSIONS.VIEW_PATIENTS,
+    PERMISSIONS.MANAGE_PATIENTS,
+    PERMISSIONS.PROVIDE_CONSULTATION,
+    PERMISSIONS.GENERATE_REPORT,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+    PERMISSIONS.VIEW_ATTENDANCE,
+  ],
+  
+  // Clinical: Nurses & OPD support
+  NURSE: [
+    PERMISSIONS.VIEW_PATIENTS,
+    PERMISSIONS.MANAGE_PATIENTS,
+    PERMISSIONS.RECORD_VITALS,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  // OPD Operations
+  OPD_ASSISTANT: [
+    PERMISSIONS.RECORD_VITALS,
+    PERMISSIONS.VIEW_PATIENTS,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  OPD_COORDINATOR: [
+    PERMISSIONS.MANAGE_QUEUE,
+    PERMISSIONS.VIEW_PATIENTS,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  OPD_MANAGER: [
+    PERMISSIONS.MANAGE_QUEUE,
+    PERMISSIONS.ACCESS_ALL_QUEUES,
+    PERMISSIONS.RECORD_VITALS,
+    PERMISSIONS.PROVIDE_CONSULTATION,
+    PERMISSIONS.VIEW_PATIENTS,
+    PERMISSIONS.MANAGE_PATIENTS,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  RECEPTIONIST: [
+    PERMISSIONS.MANAGE_QUEUE,
+    PERMISSIONS.VIEW_PATIENTS,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  // Diagnostics: Core lab role
+  PATHOLOGY: [
+    PERMISSIONS.GENERATE_REPORT,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.MANAGE_DIAGNOSTICS,
+    PERMISSIONS.APPROVE_QC,
+    PERMISSIONS.REVIEW_PATHOLOGY,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  LAB_TECHNICIAN: [
+    PERMISSIONS.GENERATE_REPORT,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.MANAGE_DIAGNOSTICS,
+    PERMISSIONS.APPROVE_QC,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  // Diagnostic imaging roles
+  XRAY: [
+    PERMISSIONS.GENERATE_REPORT,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.MANAGE_DIAGNOSTICS,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  CT_SCAN: [
+    PERMISSIONS.GENERATE_REPORT,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.MANAGE_DIAGNOSTICS,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  MRI: [
+    PERMISSIONS.GENERATE_REPORT,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.MANAGE_DIAGNOSTICS,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  ULTRASOUND: [
+    PERMISSIONS.GENERATE_REPORT,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.MANAGE_DIAGNOSTICS,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  ECG: [
+    PERMISSIONS.GENERATE_REPORT,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.MANAGE_DIAGNOSTICS,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  ENDOSCOPY: [
+    PERMISSIONS.GENERATE_REPORT,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.MANAGE_DIAGNOSTICS,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  // Billing
+  BILLING_ENTRY: [
+    PERMISSIONS.BILLING_ACCESS,
+    PERMISSIONS.VIEW_PATIENTS,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  BILLING_EXIT: [
+    PERMISSIONS.BILLING_ACCESS,
+    PERMISSIONS.VIEW_PATIENTS,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  // Generic employee role (base permissions)
+  EMPLOYEE: [
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+    PERMISSIONS.VIEW_ATTENDANCE,
+  ],
+  
+  // IPD-Specific Roles
+  IPD_DOCTOR: [
+    PERMISSIONS.IPD_ADMIT_PATIENT,
+    PERMISSIONS.IPD_VIEW_PATIENT,
+    PERMISSIONS.IPD_EDIT_PATIENT,
+    PERMISSIONS.IPD_VIEW_BEDS,
+    PERMISSIONS.IPD_WRITE_NOTES,
+    PERMISSIONS.IPD_VIEW_NOTES,
+    PERMISSIONS.IPD_MANAGE_ORDERS,
+    PERMISSIONS.IPD_VIEW_ORDERS,
+    PERMISSIONS.IPD_CREATE_CARE_PLAN,
+    PERMISSIONS.IPD_VIEW_CARE_PLAN,
+    PERMISSIONS.IPD_MANAGE_PROCEDURES,
+    PERMISSIONS.IPD_TRANSFER_PATIENT,
+    PERMISSIONS.IPD_VIEW_TRANSFERS,
+    PERMISSIONS.IPD_DISCHARGE_PATIENT,
+    PERMISSIONS.IPD_VIEW_DISCHARGE,
+    PERMISSIONS.IPD_PRINT_DISCHARGE_SUMMARY,
+    PERMISSIONS.IPD_MANAGE_ALERTS,
+    PERMISSIONS.IPD_VIEW_ALERTS,
+    PERMISSIONS.IPD_VIEW_CONSENT,
+    PERMISSIONS.IPD_VIEW_BILLING,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  IPD_NURSE: [
+    PERMISSIONS.IPD_VIEW_PATIENT,
+    PERMISSIONS.IPD_VIEW_BEDS,
+    PERMISSIONS.IPD_WRITE_NOTES,
+    PERMISSIONS.IPD_VIEW_NOTES,
+    PERMISSIONS.IPD_VIEW_ORDERS,
+    PERMISSIONS.IPD_MANAGE_MEDICATIONS,
+    PERMISSIONS.IPD_VIEW_MAR,
+    PERMISSIONS.IPD_VIEW_CARE_PLAN,
+    PERMISSIONS.IPD_VIEW_TRANSFERS,
+    PERMISSIONS.IPD_VIEW_DISCHARGE,
+    PERMISSIONS.IPD_MANAGE_ALERTS,
+    PERMISSIONS.IPD_VIEW_ALERTS,
+    PERMISSIONS.IPD_VIEW_CONSENT,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  IPD_ADMIN: [
+    PERMISSIONS.IPD_ADMIT_PATIENT,
+    PERMISSIONS.IPD_VIEW_PATIENT,
+    PERMISSIONS.IPD_EDIT_PATIENT,
+    PERMISSIONS.IPD_MANAGE_BEDS,
+    PERMISSIONS.IPD_VIEW_BEDS,
+    PERMISSIONS.IPD_WRITE_NOTES,
+    PERMISSIONS.IPD_VIEW_NOTES,
+    PERMISSIONS.IPD_MANAGE_ORDERS,
+    PERMISSIONS.IPD_VIEW_ORDERS,
+    PERMISSIONS.IPD_MANAGE_MEDICATIONS,
+    PERMISSIONS.IPD_VIEW_MAR,
+    PERMISSIONS.IPD_CREATE_CARE_PLAN,
+    PERMISSIONS.IPD_VIEW_CARE_PLAN,
+    PERMISSIONS.IPD_MANAGE_PROCEDURES,
+    PERMISSIONS.IPD_TRANSFER_PATIENT,
+    PERMISSIONS.IPD_VIEW_TRANSFERS,
+    PERMISSIONS.IPD_DISCHARGE_PATIENT,
+    PERMISSIONS.IPD_VIEW_DISCHARGE,
+    PERMISSIONS.IPD_PRINT_DISCHARGE_SUMMARY,
+    PERMISSIONS.IPD_MANAGE_ALERTS,
+    PERMISSIONS.IPD_VIEW_ALERTS,
+    PERMISSIONS.IPD_VIEW_AUDIT_LOG,
+    PERMISSIONS.IPD_MANAGE_CONSENT,
+    PERMISSIONS.IPD_VIEW_CONSENT,
+    PERMISSIONS.IPD_VIEW_BILLING,
+    PERMISSIONS.IPD_MANAGE_CHARGES,
+    PERMISSIONS.INVITE_USER,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
+  
+  IPD_RECEPTIONIST: [
+    PERMISSIONS.IPD_ADMIT_PATIENT,
+    PERMISSIONS.IPD_VIEW_PATIENT,
+    PERMISSIONS.IPD_MANAGE_BEDS,
+    PERMISSIONS.IPD_VIEW_BEDS,
+    PERMISSIONS.IPD_VIEW_NOTES,
+    PERMISSIONS.IPD_VIEW_ORDERS,
+    PERMISSIONS.IPD_TRANSFER_PATIENT,
+    PERMISSIONS.IPD_VIEW_TRANSFERS,
+    PERMISSIONS.IPD_VIEW_DISCHARGE,
+    PERMISSIONS.IPD_PRINT_DISCHARGE_SUMMARY,
+    PERMISSIONS.IPD_MANAGE_CONSENT,
+    PERMISSIONS.IPD_VIEW_CONSENT,
+    PERMISSIONS.IPD_VIEW_BILLING,
+    PERMISSIONS.VIEW_PROFILE,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.MARK_ATTENDANCE,
+  ],
 };
 
+/**
+ * Get permissions for a given role
+ * @param {string} role - Role name (e.g., 'DOCTOR', 'ADMIN')
+ * @returns {string[]} Array of permission strings
+ */
 export function getPermissionsForRole(role) {
-  return ROLE_PERMISSIONS[role] || [];
+  if (!role) return [];
+  const perms = ROLE_PERMISSIONS[role];
+  return Array.isArray(perms) ? perms : [];
 }
 
-export default ROLE_PERMISSIONS;
+/**
+ * Check if a role has a specific permission
+ * @param {string} role - Role name
+ * @param {string} permission - Permission name
+ * @returns {boolean} True if role has permission
+ */
+export function roleHasPermission(role, permission) {
+  if (role === 'SUPER_ADMIN' || role === 'ADMIN') return true;
+  const permissions = getPermissionsForRole(role);
+  return permissions.includes(permission);
+}
+
+/**
+ * Check if user has required permission(s)
+ * @param {string[]} userPermissions - Array of permission strings from user token
+ * @param {string|string[]} requiredPermissions - Single permission or array
+ * @param {boolean} requireAll - If true, user must have ALL permissions; if false, user must have ANY (default: false)
+ * @returns {boolean} True if user has required permission(s)
+ */
+export function hasPermission(userPermissions, requiredPermissions, requireAll = false) {
+  if (!userPermissions || userPermissions.length === 0) return false;
+  
+  const required = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
+  if (required.length === 0) return true;
+  
+  const userSet = new Set(userPermissions);
+  
+  if (requireAll) {
+    return required.every(perm => userSet.has(perm));
+  } else {
+    return required.some(perm => userSet.has(perm));
+  }
+}
+
+/**
+ * DEPRECATED: For backward compatibility only
+ * Use hasPermission() or roleHasPermission() instead
+ * @deprecated Use hasPermission() instead
+ */
+export function hasPermissions(userPermissions, requiredPermissions, requireAll = true) {
+  return hasPermission(userPermissions, requiredPermissions, requireAll);
+}
+
+export default {
+  PERMISSIONS,
+  ROLE_PERMISSIONS,
+  getPermissionsForRole,
+  roleHasPermission,
+  hasPermission,
+  hasPermissions,
+};

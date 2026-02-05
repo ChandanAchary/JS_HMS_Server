@@ -78,10 +78,11 @@ export class DiagnosticTemplateService {
     
     const grouped = {};
     templates.forEach(t => {
-      if (!grouped[t.testCategory]) {
-        grouped[t.testCategory] = [];
+      const cat = t.category || t.testCategory;
+      if (!grouped[cat]) {
+        grouped[cat] = [];
       }
-      grouped[t.testCategory].push(this.formatTemplate(t));
+      grouped[cat].push(this.formatTemplate(t));
     });
 
     return grouped;
@@ -286,10 +287,10 @@ export class DiagnosticTemplateService {
       throw new ForbiddenError('Access denied');
     }
 
-    await this.repository.setAsDefault(templateId, template.testCategory, template.hospitalId);
+    await this.repository.setAsDefault(templateId, template.category || template.testCategory, template.hospitalId);
 
     return {
-      message: `Template set as default for ${template.testCategory}`
+      message: `Template set as default for ${template.category || template.testCategory}`
     };
   }
 
@@ -373,7 +374,7 @@ export class DiagnosticTemplateService {
       templateCode: t.templateCode,
       templateName: t.templateName,
       description: t.description,
-      testCategory: t.testCategory,
+      category: t.testCategory || t.category,
       testSubCategory: t.testSubCategory || null,
       testId: t.testId || null,
       testCode: t.testCode || null,
@@ -506,7 +507,7 @@ export class DiagnosticTemplateService {
       templateCode: template.templateCode,
       templateName: template.templateName,
       description: template.description,
-      testCategory: template.testCategory,
+      testCategory: template.category || template.testCategory,
       testSubCategory: template.testSubCategory,
       testCode: template.testCode,
       templateType: template.templateType,
@@ -530,7 +531,7 @@ export class DiagnosticTemplateService {
       
       // Hospital info
       hospitalId: template.hospitalId,
-      hospitalName: template.hospital?.name || (template.isSystemTemplate ? 'System Template' : null),
+      hospitalName: template.hospital?.hospitalName || (template.isSystemTemplate ? 'System Template' : null),
       
       // Audit
       createdAt: template.createdAt,

@@ -22,6 +22,7 @@ import { diagnosticsRoutes } from '../modules/diagnostics/index.js';
 import { departmentRoutes } from '../modules/department/index.js';
 import { queueRoutes } from '../modules/queue/index.js';
 import { visitRouter } from '../modules/visit/index.js';
+import { opdRoutes } from '../modules/opd/index.js';
 
 /**
  * Initialize all API routes
@@ -86,10 +87,13 @@ export function initializeApiRoutes(prisma) {
   // Visit management routes (protected internally)
   router.use('/visits', visitRouter);
 
+  // OPD (Out-Patient Department) routes - vitals, clinical notes, prescriptions (protected internally)
+  router.use('/opd', opdRoutes);
+
   // Admin routes (protected internally with adminOnly)
   router.use('/admin', adminRoutes);
 
-  logger.info('[API] Routes initialized - 15 modules mounted');
+  logger.info('[API] Routes initialized - 16 modules mounted');
 
   return router;
 }
@@ -114,6 +118,7 @@ export function getApiInfo() {
       'diagnostics',
       'queue',
       'visits',
+      'opd',
       'departments',
       'admin',
       'onboarding',

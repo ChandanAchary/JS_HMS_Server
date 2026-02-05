@@ -54,7 +54,7 @@ export const EMPLOYEE_QUALIFICATIONS = [
 export const EMPLOYEE_ROLES = [
   { label: "Billing", options: ["BILLING_ENTRY", "BILLING_EXIT"] },
   { label: "Diagnosis", options: ["XRAY", "MRI", "CT_SCAN", "PATHOLOGY"] },
-  { label: "Nursing", options: ["NURSE_OPD", "NURSE_IPD"] },
+  { label: "Nursing", options: ["NURSE"] },
   { label: "Other Roles", options: ["RECEPTION", "PHARMACY", "WARD_ASSISTANT", "LAB_TECHNICIAN", "SECURITY", "HOUSEKEEPING"] }
 ];
 
@@ -62,7 +62,7 @@ export const EMPLOYEE_ROLES = [
 export const EMPLOYEE_ROLES_FLAT = [
   "BILLING_ENTRY", "BILLING_EXIT",
   "XRAY", "MRI", "CT_SCAN", "PATHOLOGY",
-  "NURSE_OPD", "NURSE_IPD",
+  "NURSE",
   "RECEPTION", "PHARMACY", "WARD_ASSISTANT", "LAB_TECHNICIAN", "SECURITY", "HOUSEKEEPING"
 ];
 
@@ -253,7 +253,7 @@ export const defaultEmployeeFields = [
     order: 7
   },
   {
-    fieldName: "roleAppliedFor",
+    fieldName: "roleApplied",
     fieldLabel: "Role Applied For",
     fieldType: "dropdown",
     isEnabled: true,

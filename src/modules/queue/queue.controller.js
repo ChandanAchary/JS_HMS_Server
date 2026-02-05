@@ -18,13 +18,13 @@ function getQueueService(req) {
 /**
  * Create service queue
  * POST /api/queue/service-queues
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function createServiceQueue(req, res, next) {
   try {
     const queueService = getQueueService(req);
     const result = await queueService.createServiceQueue(
       req.body,
-      req.hospitalId,
       req.user?.id
     );
     res.status(201).json(ApiResponse.success(result, 'Service queue created'));
@@ -36,13 +36,14 @@ export async function createServiceQueue(req, res, next) {
 /**
  * Get all service queues
  * GET /api/queue/service-queues
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function getServiceQueues(req, res, next) {
   try {
     const queueService = getQueueService(req);
     const { serviceType, department, isActive, doctorId } = req.query;
     
-    const result = await queueService.getServiceQueues(req.hospitalId, {
+    const result = await queueService.getServiceQueues({
       serviceType,
       department,
       isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
@@ -58,14 +59,12 @@ export async function getServiceQueues(req, res, next) {
 /**
  * Get service queue details
  * GET /api/queue/service-queues/:id
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function getServiceQueueDetails(req, res, next) {
   try {
     const queueService = getQueueService(req);
-    const result = await queueService.getServiceQueueDetails(
-      req.params.id,
-      req.hospitalId
-    );
+    const result = await queueService.getServiceQueueDetails(req.params.id);
     res.json(ApiResponse.success(result));
   } catch (error) {
     next(error);
@@ -75,14 +74,14 @@ export async function getServiceQueueDetails(req, res, next) {
 /**
  * Update service queue
  * PUT /api/queue/service-queues/:id
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function updateServiceQueue(req, res, next) {
   try {
     const queueService = getQueueService(req);
     const result = await queueService.updateServiceQueue(
       req.params.id,
-      req.body,
-      req.hospitalId
+      req.body
     );
     res.json(ApiResponse.success(result, 'Service queue updated'));
   } catch (error) {
@@ -93,6 +92,7 @@ export async function updateServiceQueue(req, res, next) {
 /**
  * Pause/Resume service queue
  * POST /api/queue/service-queues/:id/toggle
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function toggleServiceQueue(req, res, next) {
   try {
@@ -102,8 +102,7 @@ export async function toggleServiceQueue(req, res, next) {
     const result = await queueService.toggleQueueStatus(
       req.params.id,
       isPaused,
-      reason,
-      req.hospitalId
+      reason
     );
     res.json(ApiResponse.success(result));
   } catch (error) {
@@ -133,6 +132,7 @@ export async function getQueueDisplay(req, res, next) {
 /**
  * Add patient to queue (check-in)
  * POST /api/queue/check-in
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function checkInPatient(req, res, next) {
   try {
@@ -157,7 +157,7 @@ export async function checkInPatient(req, res, next) {
       urgency,
       specialNeeds,
       notes
-    }, req.hospitalId, req.user?.id);
+    }, req.user?.id);
     
     res.status(201).json(ApiResponse.success(result, 'Patient added to queue'));
   } catch (error) {
@@ -168,13 +168,13 @@ export async function checkInPatient(req, res, next) {
 /**
  * Auto-queue from billing
  * POST /api/queue/auto-queue
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function autoQueueFromBilling(req, res, next) {
   try {
     const queueService = getQueueService(req);
     const result = await queueService.autoQueueFromBilling(
       req.body,
-      req.hospitalId,
       req.user?.id
     );
     res.json(ApiResponse.success(result));
@@ -222,13 +222,13 @@ export async function getPatientQueues(req, res, next) {
 /**
  * Call next patient
  * POST /api/queue/service-queues/:id/call-next
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function callNextPatient(req, res, next) {
   try {
     const queueService = getQueueService(req);
     const result = await queueService.callNextPatient(
       req.params.id,
-      req.hospitalId,
       req.user?.id
     );
     res.json(ApiResponse.success(result));
@@ -240,13 +240,13 @@ export async function callNextPatient(req, res, next) {
 /**
  * Start serving patient
  * POST /api/queue/entries/:id/start-serving
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function startServing(req, res, next) {
   try {
     const queueService = getQueueService(req);
     const result = await queueService.startServing(
       req.params.id,
-      req.hospitalId,
       req.user?.id
     );
     res.json(ApiResponse.success(result));
@@ -258,13 +258,13 @@ export async function startServing(req, res, next) {
 /**
  * Complete service
  * POST /api/queue/entries/:id/complete
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function completeService(req, res, next) {
   try {
     const queueService = getQueueService(req);
     const result = await queueService.completeService(
       req.params.id,
-      req.hospitalId,
       req.user?.id
     );
     res.json(ApiResponse.success(result));
@@ -276,13 +276,13 @@ export async function completeService(req, res, next) {
 /**
  * Skip patient
  * POST /api/queue/entries/:id/skip
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function skipPatient(req, res, next) {
   try {
     const queueService = getQueueService(req);
     const result = await queueService.skipPatient(
       req.params.id,
-      req.hospitalId,
       req.user?.id
     );
     res.json(ApiResponse.success(result));
@@ -294,13 +294,13 @@ export async function skipPatient(req, res, next) {
 /**
  * Recall patient
  * POST /api/queue/entries/:id/recall
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function recallPatient(req, res, next) {
   try {
     const queueService = getQueueService(req);
     const result = await queueService.recallPatient(
       req.params.id,
-      req.hospitalId,
       req.user?.id
     );
     res.json(ApiResponse.success(result));
@@ -312,6 +312,7 @@ export async function recallPatient(req, res, next) {
 /**
  * Transfer patient to another queue
  * POST /api/queue/entries/:id/transfer
+ * NOTE: hospitalId is automatically managed via TenantContext (single-tenant)
  */
 export async function transferPatient(req, res, next) {
   try {
@@ -322,7 +323,6 @@ export async function transferPatient(req, res, next) {
       req.params.id,
       newServiceQueueId,
       reason,
-      req.hospitalId,
       req.user?.id
     );
     res.json(ApiResponse.success(result, 'Patient transferred'));
