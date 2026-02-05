@@ -252,6 +252,16 @@ model Employee {
   technicianSlots       LabSlot[]    @relation("TechnicianSlots")
   serviceQueues         ServiceQueue[] // Queues where this employee serves
 
+  // IPD Relations
+  ipdRequestedBy        IPDAdmissionRequest[] @relation("IPDRequestedBy")
+  ipdApprovedBy         IPDAdmissionRequest[] @relation("IPDApprovedBy")
+  ipdRejectedBy         IPDAdmissionRequest[] @relation("IPDRejectedBy")
+  ipdAdmittingDoctor    IPDAdmission[] @relation("AdmittingDoctor")
+  ipdProgressNotes      IPDProgressNote[] @relation("IPDProgressNoteCreator")
+  ipdOrders             IPDOrder[] @relation("IPDOrderCreator")
+  ipdAlertAssignee      IPDAlert[] @relation("IPDAlertAssignee")
+  ipdMovements          IPDPatientMovement[] @relation("IPDMovementCreator")
+
   @@unique([email, isDeleted])
   @@unique([phone, isDeleted])
   @@index([hospitalId])
@@ -968,7 +978,7 @@ model DiagnosticResult {
   // Result values
   resultValue     String?  // "13.5", "Positive", "Normal"
   resultNumeric   Float?   // For numeric results
-  resultUnit      String?  // g/dL, mg/dL, etc.
+  resultUnit      String?  // g/dL, mg/dL, U/L, etc.
   
   // Reference range at time of result
   referenceMin    Float?
@@ -1914,22 +1924,22 @@ model IPDAdmissionRequest {
   // Workflow status
   status                String    @default("PENDING") // PENDING, APPROVED, ADMITTED, REJECTED
   requestedBy           String    // Doctor ID who created request
-  requestedByUser       Employee? @relation("IPDRequestedBy", fields: [requestedBy], references: [id])
+  requestedByUser       Employee  @relation("IPDRequestedBy", fields: [requestedBy], references: [id], onDelete: Restrict)
   requestedAt           DateTime  @default(now())
   
   // Approval workflow
   approvedBy            String?   // Bed Manager/Ward In-Charge ID
-  approvedByUser        Employee? @relation("IPDApprovedBy", fields: [approvedBy], references: [id])
+  approvedByUser        Employee? @relation("IPDApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
   approvedAt            DateTime?
   
   // Rejection workflow
   rejectedBy            String?   // Who rejected
-  rejectedByUser        Employee? @relation("IPDRejectedBy", fields: [rejectedBy], references: [id])
+  rejectedByUser        Employee? @relation("IPDRejectedBy", fields: [rejectedBy], references: [id], onDelete: SetNull)
   rejectedAt            DateTime?
   rejectionReason       String?
   
   // Link to actual IPD admission when created
-  admissionId           String?
+  admissionId           String?   @unique
   admission             IPDAdmission? @relation("RequestToAdmission", fields: [admissionId], references: [id])
   
   // Hospital context
@@ -1965,7 +1975,7 @@ model IPDAdmission {
   allergies             String?
   emergencyContact      String?
   admittingDoctorId     String
-  admittingDoctor       Employee? @relation("AdmittingDoctor", fields: [admittingDoctorId], references: [id])
+  admittingDoctor       Employee  @relation("AdmittingDoctor", fields: [admittingDoctorId], references: [id], onDelete: Restrict)
   departmentId          String?
   
   // Status and dates
@@ -1984,7 +1994,7 @@ model IPDAdmission {
   clinicalNotes         IPDProgressNote[]
   orders                IPDOrder[]
   vitalSigns            IPDVitalSigns[]
-  transfers             IPDPatientMovement[]
+  transfers             IPDPatientMovement[] @relation("IPDPatientMovementAdmission")
   discharge             IPDDischargeSummary?
   consents              IPDConsent[]
   alerts                IPDAlert[]
@@ -2063,9 +2073,8 @@ model IPDVitalSigns {
   hasAbnormality        Boolean   @default(false)
   abnormalityNotes      String?
   
-  // Alert generation
-  alertId               String?
-  alert                 IPDAlert? @relation(fields: [alertId], references: [id])
+  // Alert generation (one-to-many: one vital can trigger multiple alerts)
+  alerts                IPDAlert[] @relation("IPDAlertVitalSign")
   
   hospitalId            String
   hospital              Hospital  @relation("IPDVitalSigns", fields: [hospitalId], references: [id], onDelete: Cascade)
@@ -2093,7 +2102,7 @@ model IPDProgressNote {
   
   // Author information
   createdBy             String    // User ID
-  createdByUser         Employee? @relation(fields: [createdBy], references: [id])
+  createdByUser         Employee  @relation("IPDProgressNoteCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   
   // Editing
   editedBy              String?
@@ -2134,7 +2143,7 @@ model IPDOrder {
   
   // Ordering physician
   orderedBy             String
-  orderedByUser         Employee? @relation(fields: [orderedBy], references: [id])
+  orderedByUser         Employee  @relation("IPDOrderCreator", fields: [orderedBy], references: [id], onDelete: Restrict)
   
   // Scheduled date
   scheduledDate         DateTime?
@@ -2171,13 +2180,13 @@ model IPDAlert {
   acknowledgedBy        String?
   acknowledgedAt        DateTime?
   
-  // Vital sign reference
+  // Vital sign reference (many-to-one: multiple alerts can be triggered by one vital)
   vitalSignId           String?
-  vitalSign             IPDVitalSigns? @relation(fields: [vitalSignId], references: [id])
+  vitalSign             IPDVitalSigns? @relation("IPDAlertVitalSign", fields: [vitalSignId], references: [id], onDelete: SetNull)
   
   // Alert routing
   assignedTo            String?   // User ID
-  assignedToUser        Employee? @relation(fields: [assignedTo], references: [id])
+  assignedToUser        Employee? @relation("IPDAlertAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
   
   hospitalId            String
   hospital              Hospital  @relation("IPDAlert", fields: [hospitalId], references: [id], onDelete: Cascade)
@@ -2232,6 +2241,7 @@ model IPDPatientMovement {
   id                    String    @id @default(cuid())
   
   admissionId           String?
+  admission             IPDAdmission? @relation("IPDPatientMovementAdmission", fields: [admissionId], references: [id], onDelete: SetNull)
   patientId             String
   patient               Patient   @relation("IPDPatientMovement", fields: [patientId], references: [id], onDelete: Cascade)
   
@@ -2239,7 +2249,7 @@ model IPDPatientMovement {
   movementType          String    // ADMISSION, TRANSFER, ICU, OT, DISCHARGE
   fromBedId             String?
   toBedId               String?
-  toBed                 IPDBed    @relation(fields: [toBedId], references: [id])
+  toBed                 IPDBed?   @relation(fields: [toBedId], references: [id], onDelete: SetNull)
   
   // Details
   reason                String?
@@ -2248,7 +2258,7 @@ model IPDPatientMovement {
   // Status
   transferDate          DateTime  @default(now())
   movedBy               String    // User ID
-  movedByUser           Employee? @relation(fields: [movedBy], references: [id])
+  movedByUser           Employee  @relation("IPDMovementCreator", fields: [movedBy], references: [id], onDelete: Restrict)
   
   hospitalId            String
   hospital              Hospital  @relation("IPDPatientMovement", fields: [hospitalId], references: [id], onDelete: Cascade)
