@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "build": "tsc",
+    "build": "npm install && npm run generate",
     "test": "node --test tests/auth.middleware.node.test.mjs",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
