@@ -38,7 +38,7 @@ export class OpdDashboardService {
       if (userType === 'DOCTOR') {
         whereClause.OR = [
           { status: status === 'ALL' ? undefined : status },
-          { assignedDoctorId: userId }
+          { doctorId: userId }
         ];
       }
 
@@ -56,22 +56,18 @@ export class OpdDashboardService {
               gender: true,
               bloodGroup: true,
               phone: true,
-              email: true,
               address: true,
               emergencyContactName: true,
-              emergencyContactPhone: true,
-              emergencyContactRelation: true
+              emergencyContactPhone: true
             }
           },
           serviceQueue: {
             include: {
-              assignedDoctor: {
+              doctor: {
                 select: {
                   id: true,
-                  firstName: true,
-                  lastName: true,
-                  specialization: true,
-                  role: true
+                  name: true,
+                  specialization: true
                 }
               }
             }
@@ -95,7 +91,6 @@ export class OpdDashboardService {
             select: {
               id: true,
               billId: true,
-              billNumber: true,
               totalAmount: true,
               paymentStatus: true,
               services: true
@@ -177,12 +172,10 @@ export class OpdDashboardService {
             gender: queue.patient.gender,
             bloodGroup: queue.patient.bloodGroup,
             phone: queue.patient.phone,
-            email: queue.patient.email,
             address: queue.patient.address,
             emergencyContact: {
               name: queue.patient.emergencyContactName,
-              phone: queue.patient.emergencyContactPhone,
-              relation: queue.patient.emergencyContactRelation
+              phone: queue.patient.emergencyContactPhone
             }
           },
 
@@ -220,16 +213,15 @@ export class OpdDashboardService {
             serviceType: queue.serviceQueue.serviceType,
             department: queue.serviceQueue.department,
             counterNumber: queue.serviceQueue.counterNumber,
-            assignedDoctor: queue.serviceQueue.assignedDoctor ? {
-              id: queue.serviceQueue.assignedDoctor.id,
-              name: `${queue.serviceQueue.assignedDoctor.firstName} ${queue.serviceQueue.assignedDoctor.lastName}`,
-              specialization: queue.serviceQueue.assignedDoctor.specialization
+            assignedDoctor: queue.serviceQueue.doctor ? {
+              id: queue.serviceQueue.doctor.id,
+              name: queue.serviceQueue.doctor.name,
+              specialization: queue.serviceQueue.doctor.specialization
             } : null
           } : null,
 
           billing: queue.bill ? {
             billId: queue.bill.billId,
-            billNumber: queue.bill.billNumber,
             totalAmount: queue.bill.totalAmount,
             paymentStatus: queue.bill.paymentStatus,
             serviceCount: queue.bill.services?.length || 0
@@ -576,7 +568,7 @@ export class OpdDashboardService {
         include: {
           serviceQueue: {
             include: {
-              assignedDoctor: true
+              doctor: true
             }
           }
         }
@@ -640,7 +632,7 @@ export class OpdDashboardService {
     const assigned = await prisma.patientQueue.findMany({
       where: {
         hospitalId,
-        assignedDoctorId: doctorId,
+        doctorId: doctorId,
         status: 'IN_PROGRESS'
       },
       include: {

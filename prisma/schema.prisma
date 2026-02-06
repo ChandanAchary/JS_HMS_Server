@@ -528,6 +528,181 @@ model VitalSigns {
   @@map("vital_signs")
 }
 
+// ============== OPD CONSULTATION NOTE ==============
+// Clinical notes recorded during OPD consultation by doctor
+// Stores diagnosis, examination findings, treatment plan, follow-up
+model OPDConsultationNote {
+  id              String @id @default(cuid())
+  
+  // Relations
+  hospitalId      String
+  patientId       String
+  visitId         String
+  
+  // Doctor who recorded the consultation
+  doctorId        String
+  doctorName      String?
+  
+  // ===== CLINICAL FINDINGS =====
+  chiefComplaint  String?    // Main complaint
+  historyOfPresentIllness String? // HPI
+  pastMedicalHistory String?  // PMH
+  familyHistory   String?
+  socialHistory   String?
+  
+  // ===== EXAMINATION =====
+  generalExamination String?  // General appearance
+  systemicExamination Json?   // { "CVS": "...", "RS": "...", "CNS": "...", "PA": "..." }
+  localExamination   String?
+  
+  // ===== DIAGNOSIS =====
+  provisionalDiagnosis String?   // Working diagnosis
+  differentialDiagnosis Json?   // Array of possible diagnoses
+  finalDiagnosis   String?      // Confirmed diagnosis
+  icdCode          String?      // ICD-10 code
+  
+  // ===== TREATMENT PLAN =====
+  treatmentPlan    String?
+  advice           String?
+  diet             String?
+  
+  // ===== INVESTIGATIONS =====
+  investigationsOrdered Json?  // Array of tests ordered
+  investigationsResults String? // Summary of results
+  
+  // ===== FOLLOW-UP =====
+  followUpRequired Boolean @default(false)
+  followUpDays     Int?
+  followUpDate     DateTime?
+  followUpInstructions String?
+  
+  // ===== REFERRAL =====
+  referralRequired Boolean @default(false)
+  referralTo       String?
+  referralReason   String?
+  
+  // ===== IPD RECOMMENDATION =====
+  ipdRecommended   Boolean @default(false)
+  ipdReason        String?
+  
+  // ===== TIMESTAMPS =====
+  consultationDate DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([visitId])
+  @@index([doctorId])
+  @@index([consultationDate])
+  @@map("opd_consultation_notes")
+}
+
+// ============== OPD PRESCRIPTION ==============
+// Prescriptions written during OPD consultation
+model OPDPrescription {
+  id              String @id @default(cuid())
+  prescriptionId  String @unique // Human-readable: RX260131001
+  
+  // Relations
+  hospitalId      String
+  patientId       String
+  visitId         String
+  
+  // Doctor who wrote the prescription
+  doctorId        String
+  doctorName      String?
+  doctorRegistrationNo String?
+  
+  // ===== PRESCRIPTION MEDICATIONS =====
+  medications     Json    // Array of medications
+  // Each medication: {
+  //   name: "Tab. Paracetamol 500mg",
+  //   genericName: "Paracetamol",
+  //   dosage: "500mg",
+  //   frequency: "TDS", (e.g., OD, BD, TDS, QID, SOS)
+  //   duration: "5 days",
+  //   instructions: "After food",
+  //   quantity: 15
+  // }
+  
+  // ===== ADDITIONAL INSTRUCTIONS =====
+  instructions    String?
+  diet            String?
+  warnings        String?
+  
+  // ===== STATUS =====
+  status          String @default("ACTIVE") // ACTIVE, DISPENSED, CANCELLED
+  dispensedAt     DateTime?
+  dispensedBy     String?
+  
+  // ===== VALIDITY =====
+  validFromDate   DateTime @default(now())
+  validUntilDate  DateTime?
+  
+  // ===== TIMESTAMPS =====
+  prescribedAt    DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([visitId])
+  @@index([doctorId])
+  @@index([prescriptionId])
+  @@map("opd_prescriptions")
+}
+
+// ============== OPD TEST ORDER ==============
+// Diagnostic tests ordered during OPD consultation
+model OPDTestOrder {
+  id              String @id @default(cuid())
+  orderNumber     String @unique // Human-readable: TEST260131001
+  
+  // Relations
+  hospitalId      String
+  patientId       String
+  visitId         String
+  
+  // Doctor who ordered the tests
+  doctorId        String
+  doctorName      String?
+  
+  // ===== TEST DETAILS =====
+  tests           Json    // Array of tests ordered
+  // Each test: {
+  //   testCode: "CBC",
+  //   testName: "Complete Blood Count",
+  //   category: "HEMATOLOGY",
+  //   urgency: "ROUTINE|URGENT|STAT",
+  //   notes: "Fasting required"
+  // }
+  
+  // Clinical indication for ordering tests
+  clinicalIndication String?
+  
+  // ===== STATUS =====
+  status          String @default("ORDERED") // ORDERED, SAMPLE_COLLECTED, IN_PROGRESS, COMPLETED, CANCELLED
+  priority        String @default("ROUTINE") // ROUTINE, URGENT, STAT
+  
+  // ===== SAMPLE COLLECTION =====
+  sampleCollectedAt DateTime?
+  sampleCollectedBy String?
+  
+  // ===== TIMESTAMPS =====
+  orderedAt       DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([visitId])
+  @@index([doctorId])
+  @@index([orderNumber])
+  @@index([status])
+  @@map("opd_test_orders")
+}
+
 // ============== ATTENDANCE ==============
 model Attendance {
   id         Int       @id @default(autoincrement())

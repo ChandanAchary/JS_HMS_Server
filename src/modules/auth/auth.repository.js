@@ -41,7 +41,7 @@ export class AuthRepository {
 
       if (admin) return { ...admin, userType: 'ADMIN' };
 
-      // Try to find employee
+      // Try to find employee by email
       const employee = await this.prisma.employee.findFirst({
         where: { 
           email: emailOrPhone.toLowerCase()
@@ -50,7 +50,7 @@ export class AuthRepository {
 
       if (employee) return { ...employee, userType: 'EMPLOYEE' };
 
-      // Try to find doctor
+      // Try to find doctor by email
       const doctor = await this.prisma.doctor.findFirst({
         where: { 
           email: emailOrPhone.toLowerCase()
@@ -59,7 +59,7 @@ export class AuthRepository {
 
       if (doctor) return { ...doctor, userType: 'DOCTOR' };
 
-      // Try phone number
+      // Try phone number for employees
       const cleanPhone = emailOrPhone.replace(/\D/g, '');
 
       const empByPhone = await this.prisma.employee.findFirst({
@@ -70,6 +70,7 @@ export class AuthRepository {
 
       if (empByPhone) return { ...empByPhone, userType: 'EMPLOYEE' };
 
+      // Try phone number for doctors
       const docByPhone = await this.prisma.doctor.findFirst({
         where: { 
           phone: cleanPhone
@@ -86,18 +87,63 @@ export class AuthRepository {
   }
 
   /**
-   * Find user by specific type
+   * Find user by specific type/role
+   * Supports both user table types (ADMIN, EMPLOYEE, DOCTOR) and role-based lookups (NURSE, etc)
    */
-  async findUserByType(userType, email) {
+  async findUserByType(userType, emailOrPhone) {
     try {
-      const model = this.getModelByUserType(userType);
-      if (!model) return null;
+      // Normalize input
+      const email = emailOrPhone.toLowerCase();
+      const cleanPhone = emailOrPhone.replace(/\D/g, '');
+      
+      // Direct table lookups (ADMIN, EMPLOYEE, DOCTOR)
+      if (userType === 'ADMIN') {
+        return await this.prisma.admin.findFirst({
+          where: { email }
+        });
+      }
+      
+      if (userType === 'DOCTOR') {
+        return await this.prisma.doctor.findFirst({
+          where: { 
+            OR: [
+              { email },
+              { phone: cleanPhone }
+            ]
+          }
+        });
+      }
+      
+      if (userType === 'EMPLOYEE') {
+        return await this.prisma.employee.findFirst({
+          where: { 
+            OR: [
+              { email },
+              { phone: cleanPhone }
+            ]
+          }
+        });
+      }
+      
+      // Role-based lookups (NURSE, OPD_ASSISTANT, etc.)
+      // These map to Employee table with role field
+      const employeeRoles = ['NURSE', 'RECEPTIONIST', 'LAB_TECHNICIAN', 'OPD_ASSISTANT', 
+                             'OPD_COORDINATOR', 'OPD_MANAGER', 'PHARMACIST', 'IPD_NURSE'];
+      
+      if (employeeRoles.includes(userType)) {
+        return await this.prisma.employee.findFirst({
+          where: {
+            role: userType,
+            OR: [
+              { email },
+              { phone: cleanPhone }
+            ]
+          }
+        });
+      }
 
-      return await model.findFirst({
-        where: { 
-          email: email.toLowerCase()
-        },
-      });
+      logger.warn(`Unknown user type: ${userType}`);
+      return null;
     } catch (error) {
       logger.error(`Error finding ${userType}:`, error);
       throw new DatabaseError(`Failed to find ${userType}`);
@@ -105,7 +151,7 @@ export class AuthRepository {
   }
 
   /**
-   * Get Prisma model by user type
+   * Get Prisma model by user type (for create/update operations)
    */
   getModelByUserType(userType) {
     const models = {

@@ -28,6 +28,7 @@ export class AuthValidators {
 
   /**
    * Validate role-specific login (role passed from route, not body)
+   * Supports all user types and roles: ADMIN, DOCTOR, EMPLOYEE, NURSE, RECEPTIONIST, etc.
    */
   static validateRoleLogin(emailOrPhone, password, role) {
     const errors = [];
@@ -40,9 +41,17 @@ export class AuthValidators {
       errors.push('Password is required');
     }
 
-    const validRoles = ['ADMIN', 'EMPLOYEE', 'DOCTOR', 'PATIENT'];
+    // Support all role types
+    const validRoles = [
+      // Base types
+      'ADMIN', 'EMPLOYEE', 'DOCTOR', 'PATIENT',
+      // Employee roles
+      'NURSE', 'RECEPTIONIST', 'LAB_TECHNICIAN', 'OPD_ASSISTANT', 
+      'OPD_COORDINATOR', 'OPD_MANAGER', 'PHARMACIST', 'IPD_NURSE'
+    ];
+    
     if (!validRoles.includes(role?.toUpperCase())) {
-      errors.push(`Invalid role in URL path`);
+      errors.push(`Invalid role: ${role}. Supported roles: ${validRoles.join(', ')}`);
     }
 
     if (errors.length > 0) {

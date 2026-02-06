@@ -48,25 +48,38 @@ export function initializeTenantPrisma() {
 
   tenantPrismaInstance = new PrismaClient({
     errorFormat: 'pretty',
-    log: [
-      { emit: 'event', level: 'query' },
-      { emit: 'event', level: 'info' },
-      { emit: 'event', level: 'warn' },
-      { emit: 'event', level: 'error' },
-    ],
+    log: process.env.NODE_ENV === 'development' 
+      ? [
+          { emit: 'event', level: 'warn' },
+          { emit: 'event', level: 'error' },
+        ]
+      : [
+          { emit: 'event', level: 'error' },
+        ],
   });
 
   // Configure connection pool settings
   // Neon pooler has a default limit of 25 connections per endpoint
-  // We use a conservative limit to avoid exhaustion
+  // We use optimized settings to prevent pool exhaustion
   if (dbUrl.includes('-pooler.neon.tech')) {
-    logger.info('[Tenant DB] Using Neon pooler endpoint - connection pool configured');
+    // Use environment variables or defaults for pool configuration
+    const poolTimeout = parseInt(process.env.DATABASE_POOL_TIMEOUT || '30', 10); // Increased from 10 to 30
+    const poolSize = parseInt(process.env.DATABASE_POOL_SIZE || '5', 10); // Conservative size
+    logger.info(`[Tenant DB] Using Neon pooler endpoint - pool timeout: ${poolTimeout}s, size: ${poolSize}`);
+    
+    // CRITICAL: Set connection timeout at DATABASE_URL level
+    if (!dbUrl.includes('?')) {
+      dbUrl += `?connection_limit=${poolSize}&statement_timeout=30000&connect_timeout=10`;
+    }
   }
 
-  // Log queries in development
+  // Log queries in development (but not all queries to avoid performance issues)
   if (process.env.NODE_ENV === 'development') {
     tenantPrismaInstance.$on('query', (e) => {
-      logger.debug(`[Query] ${e.query} (${e.duration}ms)`);
+      // Only log slow queries (> 1s) in development
+      if (e.duration > 1000) {
+        logger.debug(`[SLOW QUERY] ${e.query} (${e.duration}ms)`);
+      }
     });
   }
 

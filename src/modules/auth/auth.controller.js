@@ -48,6 +48,58 @@ export class AuthController {
   }
 
   /**
+   * Unified login endpoint - auto-detects user type
+   * POST /api/auth/login
+   * Body: { emailOrPhone: string, password: string }
+   * 
+   * Auto-detects whether user is ADMIN, DOCTOR, EMPLOYEE, etc.
+   * This is the recommended endpoint for login throughout the project
+   */
+  async unifiedLogin(req, res, next) {
+    try {
+      const { emailOrPhone, password } = req.body;
+
+      // Validate request
+      if (!emailOrPhone || !password) {
+        return res.status(400).json(
+          ApiResponse.badRequest('Email/Phone and password are required')
+        );
+      }
+
+      logger.info(`[Unified Login] Attempting login for: ${emailOrPhone}`);
+
+      // Try to find user by email/phone automatically (searches all user types)
+      const user = await this.repository.findUserByEmailOrPhone(emailOrPhone);
+      
+      if (!user) {
+        logger.warn(`[Unified Login] User not found: ${emailOrPhone}`);
+        return res.status(401).json(
+          ApiResponse.unauthorized('Invalid email/phone or password')
+        );
+      }
+
+      const userType = user.userType || 'EMPLOYEE';
+      logger.info(`[Unified Login] Found user: ${user.email}, type: ${userType}`);
+
+      // Perform login with detected user type
+      const result = await this.service.login(emailOrPhone, password, userType);
+
+      // Build response
+      const response = new LoginResponseDto(result.user, result.token, result.permissions);
+
+      logger.info(`[Unified Login] Successfully logged in: ${result.user.email} as ${result.user.role}`);
+      res.status(200).json(ApiResponse.success(response, 'Login successful'));
+    } catch (error) {
+      if (error.message.includes('Invalid credentials') || error.message.includes('not active')) {
+        return res.status(401).json(
+          ApiResponse.unauthorized('Invalid email/phone or password')
+        );
+      }
+      next(error);
+    }
+  }
+
+  /**
    * Register endpoint
    * POST /api/v1/auth/register
    */

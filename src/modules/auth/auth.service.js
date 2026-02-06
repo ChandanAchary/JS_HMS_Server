@@ -117,7 +117,7 @@ export class AuthService {
   }
 
   /**
-   * Login user - handles all user types
+   * Login user - handles all user types (ADMIN, DOCTOR, NURSE, RECEPTIONIST, etc)
    * Includes hospitalSetupRequired flag for admins without hospital
    */
   async login(emailOrPhone, password, userType) {
@@ -132,31 +132,54 @@ export class AuthService {
       throw new ValidationError('User type is required');
     }
 
-    // Find user
+    logger.info(`[Auth Login] Attempting login for: ${emailOrPhone}, type: ${userType}`);
+
+    // Find user by type (supports both table types and roles)
     const user = await this.repository.findUserByType(userType, emailOrPhone);
     if (!user) {
+      logger.warn(`[Auth Login] User not found: ${emailOrPhone}, type: ${userType}`);
       throw new AuthenticationError('Invalid credentials');
     }
 
+    logger.info(`[Auth Login] Found user: ${user.email}, id: ${user.id}`);
+
     // Check if user is active
-    // Admin uses registrationStep (can be ADMIN_CREATED or COMPLETE), Employee/Doctor use status = 'ACTIVE'
+    // Admin uses registrationStep, others use status = 'ACTIVE' OR isActive = true
     const isActive = userType === 'ADMIN' 
       ? user.registrationStep && ['ADMIN_CREATED', 'COMPLETE'].includes(user.registrationStep)
-      : user.status === 'ACTIVE';
+      : (user.status === 'ACTIVE' || user.isActive === true) && user.isActive !== false;
     
     if (!isActive) {
+      logger.warn(`[Auth Login] User account is not active: ${user.email}, status: ${user.status}, isActive: ${user.isActive}`);
       throw new AuthenticationError('User account is not active');
     }
 
     // Verify password
     const isPasswordValid = await this.verifyPassword(password, user.password);
     if (!isPasswordValid) {
+      logger.warn(`[Auth Login] Invalid password for user: ${user.email}`);
       throw new AuthenticationError('Invalid credentials');
     }
 
+    logger.info(`[Auth Login] Password verified for user: ${user.email}`);
+
     // Determine the role for token
-    // Admin has role field in DB, Doctor/Employee role is based on userType
-    const tokenRole = userType === 'ADMIN' ? user.role : userType;
+    // Priority: Explicitly passed userType (e.g., NURSE) -> user.role (for Employee) -> userType
+    let tokenRole = userType;
+    
+    // If user is Employee and has a role, use that role
+    if (user.role && ['NURSE', 'RECEPTIONIST', 'LAB_TECHNICIAN', 'OPD_ASSISTANT', 
+                      'OPD_COORDINATOR', 'OPD_MANAGER', 'PHARMACIST', 'IPD_NURSE'].includes(user.role)) {
+      tokenRole = user.role;
+    }
+    // For Admin, use the admin role if it exists
+    else if (userType === 'ADMIN' && user.role) {
+      tokenRole = user.role;
+    }
+    // For Doctor, use DOCTOR as role
+    else if (userType === 'DOCTOR') {
+      tokenRole = 'DOCTOR';
+    }
 
     // Generate token
     const permissions = await this.repository.getUserPermissions(tokenRole);
@@ -167,6 +190,8 @@ export class AuthService {
       permissions,
       hospitalId: user.hospitalId,
     });
+
+    logger.info(`[Auth Login] Generated token for user: ${user.email}, role: ${tokenRole}, permissions: ${permissions.join(', ')}`);
 
     // Check if admin needs to configure hospital (Phase 3 of setup)
     const hospitalSetupRequired = userType === 'ADMIN' && !user.hospitalId;

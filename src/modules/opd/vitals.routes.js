@@ -5,10 +5,8 @@
 
 import express from 'express';
 import vitalsController from './vitals.controller.js';
-
-// Middleware placeholder - replace with your actual auth middleware
-// import authMiddleware from '../../middleware/auth.middleware.js';
-// import hospitalMiddleware from '../../middleware/hospital.middleware.js';
+import { protect } from '../../core/middleware/auth.middleware.js';
+import { opdRbacMiddleware, canRecordVitals } from './opd.rbac.middleware.js';
 
 const router = express.Router();
 
@@ -19,8 +17,9 @@ const router = express.Router();
  */
 router.post(
   '/:visitId/vitals',
-  // authMiddleware.authenticate,
-  // hospitalMiddleware.injectTenantPrisma,
+  protect,
+  opdRbacMiddleware,
+  canRecordVitals,
   vitalsController.recordVitals
 );
 
@@ -30,7 +29,8 @@ router.post(
  */
 router.get(
   '/:visitId/vitals',
-  // authMiddleware.authenticate,
+  protect,
+  opdRbacMiddleware,
   vitalsController.getVitalsByVisit
 );
 
@@ -40,7 +40,8 @@ router.get(
  */
 router.get(
   '/:visitId/vitals/status',
-  // authMiddleware.authenticate,
+  protect,
+  opdRbacMiddleware,
   vitalsController.checkVitalsStatus
 );
 
@@ -50,7 +51,8 @@ router.get(
  */
 router.get(
   '/:visitId/vitals/comparison',
-  // authMiddleware.authenticate,
+  protect,
+  opdRbacMiddleware,
   vitalsController.getVitalsWithComparison
 );
 
@@ -61,8 +63,9 @@ router.get(
  */
 router.put(
   '/:visitId/vitals',
-  // authMiddleware.authenticate,
-  // hospitalMiddleware.injectTenantPrisma,
+  protect,
+  opdRbacMiddleware,
+  canRecordVitals,
   vitalsController.updateVitals
 );
 
@@ -73,7 +76,8 @@ router.put(
  */
 router.get(
   '/history/:patientId',
-  // authMiddleware.authenticate,
+  protect,
+  opdRbacMiddleware,
   vitalsController.getVitalsHistory
 );
 

@@ -13,13 +13,23 @@ export function createAuthRoutes(prisma) {
 
   /**
    * Public routes (no authentication required)
-   * Role is passed in URL path, NOT in request body
    */
-  // Role-specific login endpoints
-  // POST /api/auth/admin/login
-  // POST /api/auth/doctor/login
-  // POST /api/auth/employee/login
-  // POST /api/auth/patient/login
+  
+  /**
+   * Unified login - recommended endpoint
+   * Accepts emailOrPhone + password, auto-detects user type
+   * POST /api/auth/login
+   */
+  router.post('/login', (req, res, next) => controller.unifiedLogin(req, res, next));
+  
+  /**
+   * Role-specific login endpoints (legacy, kept for compatibility)
+   * Role is passed in URL path, NOT in request body
+   * POST /api/auth/admin/login
+   * POST /api/auth/doctor/login
+   * POST /api/auth/employee/login
+   * POST /api/auth/patient/login
+   */
   router.post('/:role/login', (req, res, next) => controller.login(req, res, next));
   
   router.post('/register', (req, res, next) => controller.register(req, res, next));
