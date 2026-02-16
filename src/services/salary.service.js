@@ -1,5 +1,5 @@
-import { tenantPrisma as prisma } from "../core/database/tenantDb.js";
-import { calculateAttendanceStatus } from "./attendanceStatus.service.js";
+﻿import { tenantPrisma as prisma } from '../core/database/tenantDb.js';
+import { calculateAttendanceStatus } from '../services/attendanceStatus.service.js';
 
 // Helper: get ISO date range strings for a month (YYYY-MM-DD)
 function getMonthStartEnd(year, month) {
@@ -120,3 +120,23 @@ function getWorkingDaysInMonth(year, month) {
 }
 
 export default { getPresentDays, calculateMonthlySalary };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

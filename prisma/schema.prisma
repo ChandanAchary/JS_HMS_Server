@@ -127,6 +127,32 @@ model Hospital {
   ipdConsents        IPDConsent[]            @relation("IPDConsent")
   ipdMovements       IPDPatientMovement[]    @relation("IPDPatientMovement")
   ipdDischargeSummaries IPDDischargeSummary[] @relation("IPDDischargeSummary")
+  
+  // New admin features relations
+  departments       Department[]
+  services          Service[]
+  staffApprovals    StaffApproval[]
+  billingConfig     BillingConfig?
+  settings          SystemSettings?
+  queueSettings     QueueSettings?
+  roles             Role[]
+  notificationTemplates NotificationTemplate[]
+  notificationLogs  NotificationLog[]
+  auditLogs         AuditLog[]
+  diagnosticPackages DiagnosticPackage[]
+  analytics         Analytics[]
+  bulkImports       BulkImport[]
+  complianceDocuments ComplianceDocument[]
+  backupLogs        BackupLog[]
+  ipdWards          IPDWard[]
+  consultationRooms ConsultationRoom[]
+  doctorSchedules   DoctorSchedule[]
+  
+  // Pharmacy & Inventory relations
+  drugs             Drug[]
+  inventory         Inventory[]
+  inventoryTransactions InventoryTransaction[]
+  prescriptionDispenses PrescriptionDispense[]
 
   @@map("hospitals")
 }
@@ -332,6 +358,7 @@ model Doctor {
   payrolls              Payroll[]    @relation("DoctorPayroll")
   diagnosticOrders      DiagnosticOrder[] @relation("OrderingDoctor")
   serviceQueues         ServiceQueue[] // Queues where this doctor serves
+  schedules             DoctorSchedule[]
 
   @@unique([email, isDeleted])
   @@unique([phone, isDeleted])
@@ -886,6 +913,9 @@ model JoinRequest {
   // Audit
   submittedAt DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  // Relations
+  staffApproval   StaffApproval?
 
   @@index([hospitalId])
   @@index([status])
@@ -2476,4 +2506,865 @@ model IPDDischargeSummary {
   @@index([patientId])
   @@index([dischargeDate])
   @@map("ipd_discharge_summaries")
+}
+
+// ============== DEPARTMENT MANAGEMENT ==============
+model Department {
+  id              String  @id @default(cuid())
+  departmentCode  String
+  departmentName  String
+  description     String?
+  
+  // Department management
+  headId          String?
+  headName        String?
+  contactPhone    String?
+  email           String?
+  
+  // Department info
+  floor           String?
+  wing            String?
+  maxBeds         Int     @default(0)
+  availableBeds   Int     @default(0)
+  
+  // Status
+  isActive        Boolean @default(true)
+  operatingHours  Json?   // { "monday": { "start": "09:00", "end": "17:00" } }
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Relations
+  services        Service[]
+  schedules       DoctorSchedule[]
+  rooms           ConsultationRoom[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([hospitalId, departmentCode])
+  @@index([hospitalId])
+  @@map("departments")
+}
+
+// ============== SERVICE/CLINIC MANAGEMENT ==============
+model Service {
+  id              String  @id @default(cuid())
+  serviceCode     String
+  serviceName     String
+  description     String?
+  
+  // Service type
+  serviceType     String  // OPD, IPD, DIAGNOSTIC, PROCEDURE, PHYSIOTHERAPY, VACCINATION, PHARMACY
+  
+  // Department link
+  departmentId    String
+  department      Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  
+  // Pricing
+  basePrice       Float   @default(0)
+  gstRate         Float   @default(18)
+  discountAllowed Boolean @default(true)
+  maxDiscountPercent Float?
+  
+  // Availability
+  isActive        Boolean @default(true)
+  availableSlots  Int?
+  
+  // Configuration
+  durationMinutes Int     @default(30)
+  requiresAppointment Boolean @default(false)
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([hospitalId, serviceCode])
+  @@index([hospitalId])
+  @@index([departmentId])
+  @@map("services")
+}
+
+// ============== STAFF APPROVAL & ONBOARDING ==============
+model StaffApproval {
+  id              String  @id @default(cuid())
+  
+  // Join request reference
+  joinRequestId   String  @unique
+  joinRequest     JoinRequest @relation(fields: [joinRequestId], references: [id], onDelete: Cascade)
+  
+  // Staff created after approval
+  staffId         String?
+  staffRole       String  // DOCTOR, EMPLOYEE
+  
+  // Approval workflow
+  status          String  @default("PENDING") // PENDING, APPROVED, REJECTED, HOLD
+  
+  // Approver info
+  approvedBy      String?
+  approverName    String?
+  approvalDate    DateTime?
+  approvalNotes   String?
+  
+  // Rejection
+  rejectionReason String?
+  rejectionDate   DateTime?
+  
+  // Compliance checks
+  qualificationsVerified Boolean @default(false)
+  licenseVerified Boolean @default(false)
+  backgroundCheck Boolean @default(false)
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([hospitalId])
+  @@index([status])
+  @@map("staff_approvals")
+}
+
+// ============== BILLING CONFIGURATION ==============
+model BillingConfig {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String  @unique
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Tax configuration
+  gstRate         Float   @default(18)
+  sgstRate        Float   @default(9)
+  cgstRate        Float   @default(9)
+  igstRate        Float   @default(18)
+  hsnSacCode      String?
+  
+  // Discount policy
+  discountAllowed Boolean @default(true)
+  maxDiscountPercent Float?
+  requiresAprovalAbove Float?
+  
+  // Payment settings
+  acceptCash      Boolean @default(true)
+  acceptCard      Boolean @default(true)
+  acceptUPI       Boolean @default(true)
+  acceptInsurance Boolean @default(true)
+  acceptNetBanking Boolean @default(true)
+  
+  // Invoice settings
+  invoicePrefix   String  @default("INV")
+  taxExemption    Boolean @default(false)
+  
+  // Compliance
+  panNumber       String?
+  gstNumber       String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("billing_configs")
+}
+
+// ============== AUDIT LOG ==============
+model AuditLog {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Action details
+  entity          String  // ADMIN, PATIENT, DOCTOR, EMPLOYEE, BILL, etc.
+  entityId        String
+  action          String  // CREATE, UPDATE, DELETE, VIEW, EXPORT
+  
+  // Actor info
+  performedBy     String
+  performedByName String?
+  performedByRole String?
+  
+  // Change tracking
+  changes         Json?   // { field: "name", oldValue: "...", newValue: "..." }
+  details         String?
+  
+  // Access info
+  ipAddress       String?
+  userAgent       String?
+  
+  // Status
+  status          String  @default("SUCCESS") // SUCCESS, FAILED, PARTIAL
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([hospitalId])
+  @@index([entity])
+  @@index([action])
+  @@index([performedBy])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============== SYSTEM SETTINGS ==============
+model SystemSettings {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String  @unique
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Hospital hours
+  workingHoursStart String? // "09:00"
+  workingHoursEnd   String? // "17:00"
+  weeklyOffDay      String? // "Sunday"
+  
+  // Availability
+  opdAvailable    Boolean @default(true)
+  ipdAvailable    Boolean @default(true)
+  diagnosticsAvailable Boolean @default(true)
+  emergencyAvailable Boolean @default(true)
+  
+  // Features
+  enableAppointments Boolean @default(true)
+  enableOnlinePayments Boolean @default(true)
+  enablePatientPortal Boolean @default(true)
+  
+  // Defaults
+  defaultOPDDuration Int @default(30)
+  defaultIPDStay   Int @default(3)
+  
+  // Holidays (JSON array of holiday dates)
+  holidays        Json?
+  
+  // Backup settings
+  autoBackupEnabled Boolean @default(true)
+  backupFrequency String? // DAILY, WEEKLY, MONTHLY
+  lastBackupDate  DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("system_settings")
+}
+
+// ============== QUEUE SETTINGS ==============
+model QueueSettings {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String  @unique
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Queue configuration
+  avgConsultationTime Int @default(15) // Minutes
+  avgDiagnosticTime Int @default(30)
+  avgBillingTime    Int @default(10)
+  
+  // Priority rules
+  priorityRatio   Int @default(3) // Every 3rd patient is priority
+  emergencyFirst  Boolean @default(true)
+  seniorCitizenPriority Boolean @default(true)
+  pregnantWomenPriority Boolean @default(true)
+  disabledPriority Boolean @default(true)
+  
+  // Auto-dequeue
+  autoSkipAfterMins Int @default(15) // Skip if not present after call
+  maxSkips        Int @default(3) // Auto-cancel after skips
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("queue_settings")
+}
+
+// ============== CUSTOM ROLES ==============
+model Role {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Role info
+  roleName        String
+  description     String?
+  roleType        String  // SYSTEM, CUSTOM
+  
+  // Permissions
+  permissions     String[] @default([])
+  
+  // Status
+  isActive        Boolean @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([hospitalId, roleName])
+  @@index([hospitalId])
+  @@map("roles")
+}
+
+// ============== NOTIFICATION SETTINGS ==============
+model NotificationTemplate {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Template details
+  templateCode    String
+  templateName    String
+  description     String?
+  
+  // Content
+  emailSubject    String?
+  emailTemplate   String?
+  smsTemplate     String?
+  appMessage      String?
+  
+  // Triggers
+  triggerEvent    String  // APPOINTMENT, ADMISSION, DISCHARGE, PAYMENT, etc.
+  
+  // Status
+  isActive        Boolean @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([hospitalId, templateCode])
+  @@index([hospitalId])
+  @@map("notification_templates")
+}
+
+// ============== NOTIFICATION LOG ==============
+model NotificationLog {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Recipient
+  recipientId     String
+  recipientName   String?
+  recipientEmail  String?
+  recipientPhone  String?
+  
+  // Notification
+  type            String  // EMAIL, SMS, APP_PUSH, WHATSAPP
+  subject         String?
+  message         String
+  template        String?
+  
+  // Status
+  status          String  @default("PENDING") // PENDING, SENT, FAILED, DELIVERED
+  sentAt          DateTime?
+  failureReason   String?
+  
+  // Tracking
+  retryCount      Int     @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([hospitalId])
+  @@index([recipientId])
+  @@index([status])
+  @@map("notification_logs")
+}
+
+// ============== DOCTOR SCHEDULE ==============
+model DoctorSchedule {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Doctor assignment
+  doctorId        String
+  doctor          Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  
+  // Department
+  departmentId    String
+  department      Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  
+  // Schedule details
+  dayOfWeek       Int     // 0 = Monday, 6 = Sunday
+  startTime       String  // "09:00"
+  endTime         String  // "17:00"
+  breakStart      String?
+  breakEnd        String?
+  
+  // Slot configuration
+  consultationDuration Int @default(30) // Minutes
+  maxPatientsPerDay Int?
+  
+  // Status
+  isActive        Boolean @default(true)
+  fromDate        DateTime?
+  toDate          DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([doctorId, dayOfWeek, startTime])
+  @@index([hospitalId])
+  @@index([doctorId])
+  @@map("doctor_schedules")
+}
+
+// ============== CONSULTATION ROOM ==============
+model ConsultationRoom {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Room info
+  roomNumber      String
+  roomName        String?
+  roomType        String  // GENERAL, PREMIUM, ICU, OT
+  
+  // Location
+  floor           Int?
+  wing            String?
+  
+  // Department
+  departmentId    String
+  department      Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  
+  // Capacity & equipment
+  capacity        Int?
+  hasEquipment    Boolean @default(false)
+  equipment       String?
+  
+  // Status
+  isAvailable     Boolean @default(true)
+  isUnderMaintenance Boolean @default(false)
+  maintenanceNotes String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([hospitalId, roomNumber])
+  @@index([hospitalId])
+  @@index([departmentId])
+  @@map("consultation_rooms")
+}
+
+// ============== IPD WARD ==============
+model IPDWard {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Ward info
+  wardCode        String
+  wardName        String
+  wardType        String  // GENERAL, SEMI_ICU, ICU, PEDIATRIC, MATERNITY
+  
+  // Bed configuration
+  totalBeds       Int
+  availableBeds   Int     @default(0)
+  
+  // Ward setup
+  floor           Int?
+  wing            String?
+  
+  // Status
+  isActive        Boolean @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([hospitalId, wardCode])
+  @@index([hospitalId])
+  @@map("ipd_wards")
+}
+
+// ============== LAB/DIAGNOSTIC CONFIGURATION ==============
+model DiagnosticPackage {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Package info
+  packageCode     String
+  packageName     String
+  description     String?
+  
+  // Pricing
+  basePrice       Float
+  gstRate         Float   @default(18)
+  discountable    Boolean @default(true)
+  
+  // Tests included
+  tests           String[] // Array of test codes
+  
+  // Status
+  isActive        Boolean @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([hospitalId, packageCode])
+  @@index([hospitalId])
+  @@map("diagnostic_packages")
+}
+
+// ============== REPORTS & ANALYTICS ==============
+model Analytics {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Report type
+  reportType      String  // PATIENT, STAFF, REVENUE, OCCUPANCY, APPOINTMENT
+  reportDate      DateTime @db.Date
+  
+  // Metrics (JSON for flexibility)
+  metrics         Json    // { "totalPatients": 150, "opdConsultations": 80, ... }
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([hospitalId])
+  @@index([reportType])
+  @@index([reportDate])
+  @@map("analytics")
+}
+
+// ============== BULK IMPORT ==============
+model BulkImport {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Import details
+  importType      String  // EMPLOYEES, DOCTORS, PATIENTS, SERVICES
+  filePath        String
+  fileName        String?
+  
+  // Progress
+  status          String  @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  totalRecords    Int?
+  successRecords  Int     @default(0)
+  failedRecords   Int     @default(0)
+  
+  // Error tracking
+  errorLog        Json?   // [ { row: 1, field: "email", error: "Invalid email" } ]
+  
+  // Audit
+  importedBy      String
+  completedAt     DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([hospitalId])
+  @@index([status])
+  @@map("bulk_imports")
+}
+
+// ============== COMPLIANCE & DOCUMENTATION ==============
+model ComplianceDocument {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Document info
+  documentCode    String
+  documentName    String
+  documentType    String  // LICENSE, CERTIFICATION, ACCREDITATION, POLICY
+  
+  // File
+  fileUrl         String
+  fileName        String?
+  
+  // Compliance
+  expiryDate      DateTime?
+  isExpired       Boolean @default(false)
+  isActive        Boolean @default(true)
+  
+  // Tracking
+  uploadedBy      String
+  uploadedAt      DateTime @default(now())
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([hospitalId])
+  @@index([documentType])
+  @@map("compliance_documents")
+}
+
+// ============== DATA BACKUP ==============
+model BackupLog {
+  id              String  @id @default(cuid())
+  
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Backup details
+  backupType      String  // MANUAL, AUTO, SCHEDULED
+  backupSize      Float   // In MB
+  
+  // Status
+  status          String  @default("PENDING") // PENDING, COMPLETED, FAILED
+  
+  // File info
+  backupFilePath  String?
+  
+  // Audit
+  initiatedBy     String?
+  completedAt     DateTime?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([hospitalId])
+  @@index([status])
+  @@map("backup_logs")
+}
+
+// ============== PHARMACY & INVENTORY MANAGEMENT ==============
+// DRUG (Master Catalog)
+model Drug {
+  id                    String    @id @default(cuid())
+  
+  hospitalId            String
+  hospital              Hospital  @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Drug identification
+  drugName              String    // Generic name: Paracetamol
+  brandName             String?   // Brand name: Calpol
+  drugCode              String    @unique // Unique identifier: PARA001
+  
+  // Classification
+  category              String    // TABLET, CAPSULE, INJECTION, SYRUP, OINTMENT, etc.
+  subcategory           String?   // Pain Relief, Antibiotic, etc.
+  
+  // Dosage & Strength
+  strength              String    // 500mg, 250mg/5ml
+  unit                  String    // mg, ml, IU
+  
+  // Therapeutic info
+  therapeuticClass      String?   // Analgesic, Antibiotic, Antacid
+  indication            String?   // Therapeutic indication
+  contraindications     String?   // Contraindications
+  sideEffects           String?   // Common side effects
+  dosageInstructions    String?   // Standard dosing instructions
+  
+  // Regulatory info
+  hsnSacCode            String?   // For GST
+  gstRate               Float     @default(5)
+  manufacturerLicense   String?
+  manufacturerName      String?
+  
+  // Stock management
+  minimumStock          Int       @default(10) // Min stock level
+  maximumStock          Int       @default(100) // Max stock level
+  reorderLevel          Int       @default(20)
+  reorderQuantity       Int       @default(50)
+  
+  // Pricing
+  costPrice             Float     // Purchase cost per unit
+  sellingPrice          Float     // Sale price per unit
+  mrp                   Float?    // Maximum Retail Price
+  
+  // Expiry & storage
+  storageCondition      String?   // Room Temperature, 2-8°C, Dark & Dry
+  shelfLife             Int?      // In months
+  
+  // Status
+  isActive              Boolean   @default(true)
+  isScheduled           Boolean   @default(false) // Scheduled drug (Narcotic)
+  requiresPrescription  Boolean   @default(false) // Rx only
+  
+  // Audit
+  createdBy             String?
+  updatedBy             String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  // Relations
+  inventory             Inventory[]
+  inventoryTransactions InventoryTransaction[]
+  
+  @@unique([hospitalId, drugCode])
+  @@index([hospitalId])
+  @@index([drugName])
+  @@index([category])
+  @@map("drugs")
+}
+
+// INVENTORY (Stock Tracking)
+model Inventory {
+  id                    String    @id @default(cuid())
+  
+  hospitalId            String
+  hospital              Hospital  @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  drugId                String
+  drug                  Drug      @relation(fields: [drugId], references: [id], onDelete: Restrict)
+  
+  // Batch tracking
+  batchNumber           String
+  manufacturingDate     DateTime  @db.Date
+  expiryDate            DateTime  @db.Date
+  
+  // Stock levels
+  quantity              Int       // Current stock
+  unit                  String    // PIECE, BOX, STRIP, VIAL
+  quantityPerUnit       Int       @default(1) // e.g., 10 tablets per strip
+  
+  // Cost tracking
+  costPrice             Float     // Purchase cost per unit
+  totalCost             Float     // quantity * costPrice
+  
+  // Vendor info
+  vendorName            String?
+  vendorContactNumber   String?
+  vendorInvoiceNumber   String?
+  purchaseOrderNumber   String?
+  purchaseDate          DateTime  @default(now())
+  
+  // Storage location
+  warehouseLocation     String?   // Warehouse/Store location
+  shelfNumber           String?   // Shelf/Compartment number
+  
+  // Status
+  isExpired             Boolean   @default(false)
+  expiringsoon          Boolean   @default(false) // Within 30 days
+  status                String    @default("ACTIVE") // ACTIVE, DAMAGED, EXPIRED, RECALLED
+  
+  // Audit
+  receivedBy            String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  // Relations
+  transactions          InventoryTransaction[]
+  
+  @@unique([hospitalId, batchNumber, drugId])
+  @@index([hospitalId])
+  @@index([drugId])
+  @@index([expiryDate])
+  @@index([status])
+  @@map("inventory")
+}
+
+// INVENTORY TRANSACTION (Audit Trail)
+model InventoryTransaction {
+  id                    String    @id @default(cuid())
+  
+  hospitalId            String
+  hospital              Hospital  @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  drugId                String
+  drug                  Drug      @relation(fields: [drugId], references: [id])
+  
+  inventoryId           String?
+  inventory             Inventory? @relation(fields: [inventoryId], references: [id])
+  
+  // Transaction details
+  transactionType       String    // PURCHASE, DISPENSE, ADJUSTMENT, RETURN, DAMAGE, EXPIRY
+  quantity              Int
+  quantityBefore        Int       // Stock before transaction
+  quantityAfter         Int       // Stock after transaction
+  
+  // Pricing
+  unitCost              Float?    // For purchase transactions
+  totalCost             Float?    // quantity * unitCost
+  
+  // Reference
+  referenceNumber       String?   // PO, Bill, RX number
+  referenceBatchNumber  String?
+  prescriptionId        String?   // For dispense transactions
+  billId                String?   // For billing reference
+  
+  // Notes
+  reason                String?   // Reason for adjustment/return
+  notes                 String?
+  
+  // Performed by
+  performedBy           String    // User ID
+  performedByName       String?
+  performedByRole       String?
+  
+  // Approval (if needed)
+  approvedBy            String?
+  approvedAt            DateTime?
+  
+  createdAt             DateTime  @default(now())
+  
+  @@index([hospitalId])
+  @@index([drugId])
+  @@index([transactionType])
+  @@index([createdAt])
+  @@map("inventory_transactions")
+}
+
+// PRESCRIPTION DISPENSE (Pharmacy Counter)
+model PrescriptionDispense {
+  id                    String    @id @default(cuid())
+  
+  hospitalId            String
+  hospital              Hospital  @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  
+  // Dispense reference
+  dispenseId            String    @unique // DISP260131001
+  prescriptionId        String?   // OPD prescription reference
+  billId                String?   // Billing reference
+  
+  // Patient
+  patientName           String
+  patientPhone          String?
+  
+  // Dispense items
+  items                 Json      // Array of dispensed items
+  // [
+  //   {
+  //     drugId: "...",
+  //     drugName: "Paracetamol 500mg",
+  //     quantity: 10,
+  //     unit: "TABLET",
+  //     costPrice: 2,
+  //     sellingPrice: 5,
+  //     amount: 50,
+  //     batchNumber: "BATCH001",
+  //     expiryDate: "2026-12-31"
+  //   }
+  // ]
+  
+  // Totals
+  subtotal              Float
+  taxAmount             Float     @default(0)
+  discountAmount        Float     @default(0)
+  totalAmount           Float
+  
+  // Payment
+  paymentMode           String?   // CASH, CARD, UPI, INSURANCE
+  paymentStatus         String    @default("UNPAID") // UNPAID, PAID, PARTIAL
+  
+  // Dispensed by
+  dispensedBy           String    // Employee ID
+  dispensedByName       String?
+  dispensedAt           DateTime  @default(now())
+  
+  // Status
+  status                String    @default("DISPENSED") // DISPENSED, RETURNED, VOIDED
+  
+  // Doctor info
+  prescribingDoctor     String?
+  
+  // Audit
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([hospitalId])
+  @@index([dispenseId])
+  @@index([dispensedAt])
+  @@index([status])
+  @@map("prescription_dispenses")
 }

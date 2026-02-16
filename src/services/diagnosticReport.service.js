@@ -14,9 +14,7 @@
  * Zero code duplication | One engine for all types | NABL compliant
  */
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../core/database/prismaClient.js';
 
 export class UniversalDiagnosticReportService {
   
@@ -768,15 +766,80 @@ export class UniversalDiagnosticReportService {
   }
 
   async sendCriticalValueNotification(report) {
-    // Implement notification logic (SMS, Email, WhatsApp)
-    console.log(`🚨 Critical values detected in report ${report.reportId}`);
-    // TODO: Send actual notifications
+    try {
+      const { sendCriticalValueNotification } = await import('./email.service.js');
+      
+      // Get patient and critical values
+      const patient = await prisma.patient.findUnique({
+        where: { id: report.patientId },
+        select: { firstName: true, lastName: true, email: true }
+      });
+
+      if (patient && patient.email) {
+        await sendCriticalValueNotification(
+          patient.email,
+          `${patient.firstName} ${patient.lastName}`,
+          report.reportNumber,
+          report.criticalValues || [],
+          report.hospitalName || 'Hospital'
+        );
+        console.log(`🚨 Critical value notification sent to ${patient.email}`);
+      }
+
+      // Also notify referring doctor if present
+      if (report.referringDoctorId) {
+        const doctor = await prisma.doctor.findUnique({
+          where: { id: report.referringDoctorId },
+          select: { email: true, firstName: true, lastName: true }
+        });
+
+        if (doctor && doctor.email) {
+          await sendCriticalValueNotification(
+            doctor.email,
+            `${patient.firstName} ${patient.lastName}`,
+            report.reportNumber,
+            report.criticalValues || [],
+            report.hospitalName || 'Hospital'
+          );
+          console.log(`🚨 Critical value notification sent to doctor ${doctor.email}`);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send critical value notification:', error);
+    }
   }
 
   async triggerReportDelivery(report) {
-    // Implement delivery mechanisms
-    console.log(`📧 Triggering delivery for report ${report.reportId}`);
-    // TODO: Send SMS, Email, WhatsApp, etc.
+    try {
+      const { sendReportDeliveryNotification } = await import('./email.service.js');
+      
+      // Get patient details
+      const patient = await prisma.patient.findUnique({
+        where: { id: report.patientId },
+        select: { firstName: true, lastName: true, email: true, phone: true }
+      });
+
+      if (patient && patient.email) {
+        const reportUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reports/${report.id}`;
+        
+        await sendReportDeliveryNotification(
+          patient.email,
+          `${patient.firstName} ${patient.lastName}`,
+          report.reportNumber,
+          reportUrl,
+          report.hospitalName || 'Hospital'
+        );
+        console.log(`📧 Report delivery notification sent to ${patient.email}`);
+      }
+
+      // TODO: Send SMS if phone number available
+      if (patient && patient.phone) {
+        console.log(`📱 SMS notification to be sent to ${patient.phone}`);
+        // Implement SMS integration here (Twilio, AWS SNS, etc.)
+      }
+    } catch (error) {
+      console.error('Failed to trigger report delivery:', error);
+    }
   }
 
   async trackReportPrint(reportId, printedBy) {
@@ -931,6 +994,104 @@ export class UniversalDiagnosticReportService {
 
     return summary;
   }
+
+  /**
+   * Get statistics for diagnostic reports
+   */
+  async getStatistics(hospitalId, filters = {}) {
+    const whereBase = { hospitalId };
+    
+    // Add date filters if provided
+    if (filters.dateFrom || filters.dateTo) {
+      whereBase.createdAt = {};
+      if (filters.dateFrom) {
+        whereBase.createdAt.gte = filters.dateFrom;
+      }
+      if (filters.dateTo) {
+        whereBase.createdAt.lte = filters.dateTo;
+      }
+    }
+
+    // Get total counts
+    const [
+      totalReports,
+      pendingReports,
+      completedReports,
+      criticalReports,
+      reportsByStatus
+    ] = await Promise.all([
+      prisma.diagnosticReport.count({ where: whereBase }),
+      prisma.diagnosticReport.count({
+        where: { ...whereBase, status: 'PENDING' }
+      }),
+      prisma.diagnosticReport.count({
+        where: { ...whereBase, status: 'COMPLETED' }
+      }),
+      prisma.diagnosticReport.count({
+        where: { ...whereBase, hasCriticalValues: true }
+      }),
+      prisma.diagnosticReport.groupBy({
+        by: ['status'],
+        where: whereBase,
+        _count: true
+      })
+    ]);
+
+    // Get reports by template type
+    const reportsByType = await prisma.diagnosticReport.groupBy({
+      by: ['reportType'],
+      where: whereBase,
+      _count: true
+    });
+
+    // Get daily report counts for the period
+    const dailyCounts = await prisma.diagnosticReport.groupBy({
+      by: ['createdAt'],
+      where: whereBase,
+      _count: true
+    });
+
+    return {
+      overview: {
+        totalReports,
+        pendingReports,
+        completedReports,
+        criticalReports
+      },
+      byStatus: reportsByStatus.reduce((acc, item) => {
+        acc[item.status] = item._count;
+        return acc;
+      }, {}),
+      byType: reportsByType.reduce((acc, item) => {
+        acc[item.reportType] = item._count;
+        return acc;
+      }, {}),
+      dailyTrend: dailyCounts.length,
+      dateRange: {
+        from: filters.dateFrom,
+        to: filters.dateTo
+      }
+    };
+  }
 }
 
 export default new UniversalDiagnosticReportService();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

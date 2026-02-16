@@ -44,3 +44,20 @@ export const calculateAttendanceStatus = (sessions = []) => {
 };
 
 export default calculateAttendanceStatus;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

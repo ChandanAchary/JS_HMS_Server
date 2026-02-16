@@ -27,3 +27,21 @@ export function hashToken(token) {
 export function getExpiryDate(minutes = 20) {
   return new Date(Date.now() + minutes * 60 * 1000);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

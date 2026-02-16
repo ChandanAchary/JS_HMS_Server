@@ -7,12 +7,13 @@
  */
 
 import { tenantPrisma } from '../database/tenantDb.js';
-import logger from '../utils/logger.js';
+import logger from '../../utils/logger.js';
 
 class TenantContext {
   constructor() {
     this.hospitalId = null;
     this.hospital = null;
+    this.isOffline = false;
   }
 
   /**
@@ -32,13 +33,22 @@ class TenantContext {
       if (hospital) {
         this.hospitalId = hospital.id;
         this.hospital = hospital;
-        logger.info('[TenantContext] Initialized with hospital:', hospital.hospitalName);
+        this.isOffline = false;
+        logger.info('[TenantContext] ✓ Initialized with hospital:', hospital.hospitalName);
       } else {
-        logger.warn('[TenantContext] No active hospital found');
+        logger.warn('[TenantContext] No active hospital found in database');
       }
     } catch (error) {
-      logger.error('[TenantContext] Failed to initialize:', error.message);
-      throw error;
+      // In development, allow offline mode
+      if (process.env.NODE_ENV === 'development' && process.env.DATABASE_ALLOW_OFFLINE !== 'false') {
+        this.isOffline = true;
+        logger.warn('[TenantContext] Database offline — running in development mode');
+        logger.warn('[TenantContext] Hospital context will use request-level hospitalId');
+        // Do NOT throw — allow server to continue
+      } else {
+        logger.error('[TenantContext] Failed to initialize:', error.message);
+        throw error;
+      }
     }
   }
 
@@ -46,7 +56,12 @@ class TenantContext {
    * Get the hospital ID (single-tenant, always the same)
    */
   getHospitalId() {
-    return this.hospitalId;
+    if (this.hospitalId) return this.hospitalId;
+    if (this.isOffline) {
+      logger.debug('[TenantContext] Database offline - hospitalId not initialized');
+      return null;
+    }
+    return null;
   }
 
   /**
@@ -61,7 +76,14 @@ class TenantContext {
    */
   getHospitalIdFromRequest(req) {
     // Prefer context if available, fallback to request
-    return this.hospitalId || req?.user?.hospitalId;
+    return this.hospitalId || req?.user?.hospitalId || null;
+  }
+
+  /**
+   * Check if running in offline mode
+   */
+  isOfflineMode() {
+    return this.isOffline;
   }
 }
 
@@ -69,3 +91,22 @@ class TenantContext {
 export const tenantContext = new TenantContext();
 
 export default tenantContext;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

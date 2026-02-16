@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+﻿import nodemailer from 'nodemailer';
 
 const BREVO_SMTP_HOST = process.env.BREVO_SMTP_HOST || "smtp-relay.brevo.com";
 const BREVO_SMTP_PORT = parseInt(process.env.BREVO_SMTP_PORT || "587", 10);
@@ -155,7 +155,7 @@ export const sendAdminRegistrationConfirmation = async (email, name, loginUrl = 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
       <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h2 style="color: #2563eb; margin-top: 0;">✅ Account Successfully Created</h2>
+        <h2 style="color: #2563eb; margin-top: 0;">âœ… Account Successfully Created</h2>
         <p>Dear <strong>${name}</strong>,</p>
         
         <p style="font-size: 16px; line-height: 1.6;">
@@ -164,7 +164,7 @@ export const sendAdminRegistrationConfirmation = async (email, name, loginUrl = 
         
         <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 4px;">
           <p style="margin: 0; color: #065f46;">
-            <strong>✓ Email Verified</strong> - Your account is ready to use
+            <strong>âœ“ Email Verified</strong> - Your account is ready to use
           </p>
         </div>
         
@@ -183,7 +183,7 @@ export const sendAdminRegistrationConfirmation = async (email, name, loginUrl = 
         
         <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
           <p style="margin: 0; color: #92400e;">
-            <strong>⚠️ Important:</strong> Keep your password secure and never share it with anyone.
+            <strong>âš ï¸ Important:</strong> Keep your password secure and never share it with anyone.
           </p>
         </div>
         
@@ -197,7 +197,7 @@ export const sendAdminRegistrationConfirmation = async (email, name, loginUrl = 
   return sendViaBrevo({
     sender: { name: SENDER_NAME, email: SENDER_EMAIL },
     to: [{ email }],
-    subject: "✅ Account Successfully Created - Ready to Login",
+    subject: "âœ… Account Successfully Created - Ready to Login",
     htmlContent: html,
     textContent: `Your admin account has been successfully created and verified. You can now login to continue with hospital setup.`
   });
@@ -213,7 +213,7 @@ export const sendLoginOtpConfirmation = async (email, name, role = "Admin") => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
       <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h2 style="color: #10b981; margin-top: 0;">✅ Login Verified</h2>
+        <h2 style="color: #10b981; margin-top: 0;">âœ… Login Verified</h2>
         <p>Dear <strong>${name}</strong>,</p>
         
         <p style="font-size: 16px; line-height: 1.6;">
@@ -222,20 +222,20 @@ export const sendLoginOtpConfirmation = async (email, name, role = "Admin") => {
         
         <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 4px;">
           <p style="margin: 0; color: #065f46;">
-            <strong>✓ Login Successful</strong> - Your session is active
+            <strong>âœ“ Login Successful</strong> - Your session is active
           </p>
         </div>
         
         <h3 style="color: #333;">Login Details:</h3>
         <ul style="color: #555; line-height: 1.8; list-style: none; padding: 0;">
-          <li>✓ <strong>Email:</strong> ${email}</li>
-          <li>✓ <strong>Role:</strong> ${role}</li>
-          <li>✓ <strong>Time:</strong> ${new Date().toLocaleString()}</li>
+          <li>âœ“ <strong>Email:</strong> ${email}</li>
+          <li>âœ“ <strong>Role:</strong> ${role}</li>
+          <li>âœ“ <strong>Time:</strong> ${new Date().toLocaleString()}</li>
         </ul>
         
         <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
           <p style="margin: 0; color: #92400e;">
-            <strong>🔒 Security Tip:</strong> If you did not login to your account, please change your password immediately.
+            <strong>ðŸ”’ Security Tip:</strong> If you did not login to your account, please change your password immediately.
           </p>
         </div>
         
@@ -249,7 +249,7 @@ export const sendLoginOtpConfirmation = async (email, name, role = "Admin") => {
   return sendViaBrevo({
     sender: { name: SENDER_NAME, email: SENDER_EMAIL },
     to: [{ email }],
-    subject: `✅ Login Verified - ${role} Account`,
+    subject: `âœ… Login Verified - ${role} Account`,
     htmlContent: html,
     textContent: `Your OTP has been verified. You are now logged in to your ${role} account.`
   });
@@ -266,7 +266,7 @@ export const sendRegistrationConfirmation = async (email, name, role, hospitalNa
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
       <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h2 style="color: #10b981; margin-top: 0;">✅ Registration Complete</h2>
+        <h2 style="color: #10b981; margin-top: 0;">âœ… Registration Complete</h2>
         <p>Dear <strong>${name}</strong>,</p>
         
         <p style="font-size: 16px; line-height: 1.6;">
@@ -275,16 +275,16 @@ export const sendRegistrationConfirmation = async (email, name, role, hospitalNa
         
         <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 4px;">
           <p style="margin: 0; color: #065f46;">
-            <strong>✓ Registration Successful</strong> - Account is active
+            <strong>âœ“ Registration Successful</strong> - Account is active
           </p>
         </div>
         
         <h3 style="color: #333;">Account Information:</h3>
         <ul style="color: #555; line-height: 1.8; list-style: none; padding: 0;">
-          <li>✓ <strong>Name:</strong> ${name}</li>
-          <li>✓ <strong>Role:</strong> ${role}</li>
-          <li>✓ <strong>Hospital:</strong> ${hospitalName}</li>
-          <li>✓ <strong>Email:</strong> ${email}</li>
+          <li>âœ“ <strong>Name:</strong> ${name}</li>
+          <li>âœ“ <strong>Role:</strong> ${role}</li>
+          <li>âœ“ <strong>Hospital:</strong> ${hospitalName}</li>
+          <li>âœ“ <strong>Email:</strong> ${email}</li>
         </ul>
         
         <h3 style="color: #333;">What's Next?</h3>
@@ -296,7 +296,7 @@ export const sendRegistrationConfirmation = async (email, name, role, hospitalNa
         
         <div style="background-color: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px;">
           <p style="margin: 0; color: #1e40af;">
-            <strong>ℹ️ Need Help?</strong> Contact your hospital administrator for support.
+            <strong>â„¹ï¸ Need Help?</strong> Contact your hospital administrator for support.
           </p>
         </div>
         
@@ -310,7 +310,7 @@ export const sendRegistrationConfirmation = async (email, name, role, hospitalNa
   return sendViaBrevo({
     sender: { name: SENDER_NAME, email: SENDER_EMAIL },
     to: [{ email }],
-    subject: `✅ Registration Complete - Welcome to ${hospitalName}`,
+    subject: `âœ… Registration Complete - Welcome to ${hospitalName}`,
     htmlContent: html,
     textContent: `Your registration as ${role} at ${hospitalName} is complete. You can now login to your account.`
   });
@@ -330,11 +330,11 @@ export const sendTenantWelcomeEmail = async (email, adminName, hospitalName, hos
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #2563eb; margin: 0;">🏥 HMS Hub</h1>
+        <h1 style="color: #2563eb; margin: 0;">ðŸ¥ HMS Hub</h1>
         <p style="color: #666;">Hospital Management System</p>
       </div>
       
-      <h2 style="color: #333;">Welcome to HMS Hub, ${adminName}! 🎉</h2>
+      <h2 style="color: #333;">Welcome to HMS Hub, ${adminName}! ðŸŽ‰</h2>
       
       <p>Congratulations! Your organization <strong>${hospitalName}</strong> has been successfully registered on HMS Hub.</p>
       
@@ -346,7 +346,7 @@ export const sendTenantWelcomeEmail = async (email, adminName, hospitalName, hos
       </div>
       
       <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <h3 style="color: #333; margin-top: 0;">📋 Quick Start Guide</h3>
+        <h3 style="color: #333; margin-top: 0;">ðŸ“‹ Quick Start Guide</h3>
         <ol style="color: #555; line-height: 1.8;">
           <li><strong>Access your portal:</strong> Visit <a href="${hospitalUrl}" style="color: #2563eb;">${hospitalUrl}</a></li>
           <li><strong>Login:</strong> Use your registered email to login</li>
@@ -358,22 +358,22 @@ export const sendTenantWelcomeEmail = async (email, adminName, hospitalName, hos
       
       <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
         <p style="margin: 0; color: #92400e;">
-          <strong>💡 Tip:</strong> Bookmark your portal URL for quick access. All your team members will use this URL to access the system.
+          <strong>ðŸ’¡ Tip:</strong> Bookmark your portal URL for quick access. All your team members will use this URL to access the system.
         </p>
       </div>
       
-      <h3 style="color: #333;">🌟 What you can do now:</h3>
+      <h3 style="color: #333;">ðŸŒŸ What you can do now:</h3>
       <ul style="color: #555; line-height: 1.8;">
-        <li>✅ Manage doctors and staff</li>
-        <li>✅ Track attendance</li>
-        <li>✅ Handle patient registrations</li>
-        <li>✅ Process billing</li>
-        <li>✅ Generate reports</li>
+        <li>âœ… Manage doctors and staff</li>
+        <li>âœ… Track attendance</li>
+        <li>âœ… Handle patient registrations</li>
+        <li>âœ… Process billing</li>
+        <li>âœ… Generate reports</li>
       </ul>
       
       <div style="text-align: center; margin: 30px 0;">
         <a href="${hospitalUrl}" style="background-color: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
-          Go to Your Portal →
+          Go to Your Portal â†’
         </a>
       </div>
       
@@ -381,7 +381,7 @@ export const sendTenantWelcomeEmail = async (email, adminName, hospitalName, hos
       
       <div style="text-align: center; color: #9ca3af; font-size: 12px;">
         <p>Need help? Contact our support team at support@hmshub.com</p>
-        <p>© ${new Date().getFullYear()} HMS Hub. All rights reserved.</p>
+        <p>Â© ${new Date().getFullYear()} HMS Hub. All rights reserved.</p>
       </div>
     </div>
   `;
@@ -402,13 +402,13 @@ Quick Start:
 
 Need help? Contact support@hmshub.com
 
-© ${new Date().getFullYear()} HMS Hub
+Â© ${new Date().getFullYear()} HMS Hub
   `;
 
   return sendViaBrevo({
     sender: { name: SENDER_NAME, email: SENDER_EMAIL },
     to: [{ email }],
-    subject: `🎉 Welcome to HMS Hub - ${hospitalName} is now live!`,
+    subject: `ðŸŽ‰ Welcome to HMS Hub - ${hospitalName} is now live!`,
     htmlContent: html,
     textContent
   });
@@ -486,7 +486,7 @@ export const sendPasswordResetEmail = async (email, name = "User", otp) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
       <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h2 style="color: #dc2626; margin-top: 0;">🔐 Password Reset Request</h2>
+        <h2 style="color: #dc2626; margin-top: 0;">ðŸ” Password Reset Request</h2>
         <p>Hi <strong>${name}</strong>,</p>
         
         <p style="font-size: 16px; line-height: 1.6;">
@@ -501,14 +501,14 @@ export const sendPasswordResetEmail = async (email, name = "User", otp) => {
         
         <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0; border-radius: 4px;">
           <p style="margin: 0; color: #991b1b;">
-            <strong>⏰ This code expires in 10 minutes.</strong><br>
+            <strong>â° This code expires in 10 minutes.</strong><br>
             Do not share this code with anyone.
           </p>
         </div>
         
         <div style="background-color: #fefce8; border-left: 4px solid #ca8a04; padding: 15px; margin: 20px 0; border-radius: 4px;">
           <p style="margin: 0; color: #854d0e;">
-            <strong>🔒 Security Notice:</strong> If you did not request this password reset, please ignore this email. Your password will remain unchanged.
+            <strong>ðŸ”’ Security Notice:</strong> If you did not request this password reset, please ignore this email. Your password will remain unchanged.
           </p>
         </div>
         
@@ -523,7 +523,7 @@ export const sendPasswordResetEmail = async (email, name = "User", otp) => {
   return sendViaBrevo({
     sender: { name: SENDER_NAME, email: SENDER_EMAIL },
     to: [{ email }],
-    subject: "🔐 Password Reset Code - Hospital Management System",
+    subject: "ðŸ” Password Reset Code - Hospital Management System",
     htmlContent: html,
     textContent: `Your password reset code is: ${otp}. This code expires in 10 minutes. Do not share it with anyone. If you did not request this, please ignore this email.`
   });
@@ -538,7 +538,7 @@ export const sendPasswordChangedEmail = async (email, name = "User") => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
       <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h2 style="color: #10b981; margin-top: 0;">✅ Password Changed Successfully</h2>
+        <h2 style="color: #10b981; margin-top: 0;">âœ… Password Changed Successfully</h2>
         <p>Hi <strong>${name}</strong>,</p>
         
         <p style="font-size: 16px; line-height: 1.6;">
@@ -547,13 +547,13 @@ export const sendPasswordChangedEmail = async (email, name = "User") => {
         
         <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 4px;">
           <p style="margin: 0; color: #065f46;">
-            <strong>✓ Password Updated</strong> - ${new Date().toLocaleString()}
+            <strong>âœ“ Password Updated</strong> - ${new Date().toLocaleString()}
           </p>
         </div>
         
         <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0; border-radius: 4px;">
           <p style="margin: 0; color: #991b1b;">
-            <strong>⚠️ Didn't make this change?</strong><br>
+            <strong>âš ï¸ Didn't make this change?</strong><br>
             If you did not change your password, your account may have been compromised. Please contact your administrator immediately and request a password reset.
           </p>
         </div>
@@ -577,9 +577,200 @@ export const sendPasswordChangedEmail = async (email, name = "User") => {
   return sendViaBrevo({
     sender: { name: SENDER_NAME, email: SENDER_EMAIL },
     to: [{ email }],
-    subject: "✅ Password Changed Successfully - Hospital Management System",
+    subject: "âœ… Password Changed Successfully - Hospital Management System",
     htmlContent: html,
     textContent: `Your password has been successfully changed. If you did not make this change, please contact your administrator immediately.`
+  });
+};
+
+/**
+ * Send critical value notification email
+ * @param {string} email - Recipient email (doctor/patient)
+ * @param {string} patientName - Patient name
+ * @param {string} reportNumber - Report number
+ * @param {Array} criticalValues - Array of critical values
+ * @param {string} hospitalName - Hospital name
+ */
+export const sendCriticalValueNotification = async (email, patientName, reportNumber, criticalValues, hospitalName) => {
+  const criticalValuesHtml = criticalValues.map(cv => `
+    <tr>
+      <td style="border: 1px solid #ddd; padding: 8px;">${cv.testName}</td>
+      <td style="border: 1px solid #ddd; padding: 8px; color: #dc2626; font-weight: bold;">${cv.value} ${cv.unit || ''}</td>
+      <td style="border: 1px solid #ddd; padding: 8px;">${cv.referenceRange || 'N/A'}</td>
+      <td style="border: 1px solid #ddd; padding: 8px;">${cv.reason || 'Critical'}</td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+      <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+          <h2 style="color: #dc2626; margin: 0;">🚨 CRITICAL VALUE ALERT</h2>
+        </div>
+        
+        <p><strong>Patient:</strong> ${patientName}</p>
+        <p><strong>Report Number:</strong> ${reportNumber}</p>
+        <p><strong>Hospital:</strong> ${hospitalName}</p>
+        <p><strong>Alert Time:</strong> ${new Date().toLocaleString()}</p>
+        
+        <h3 style="color: #dc2626;">Critical Values Detected:</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+          <thead>
+            <tr style="background-color: #f4f4f4;">
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Test</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Value</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Reference Range</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${criticalValuesHtml}
+          </tbody>
+        </table>
+        
+        <div style="background-color: #fff7ed; border-left: 4px solid #f97316; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #9a3412;">
+            <strong>⚠️ IMMEDIATE ACTION REQUIRED</strong><br>
+            These values require immediate medical attention. Please contact the patient or referring physician immediately.
+          </p>
+        </div>
+        
+        <p style="color: #888; font-size: 12px; margin-top: 30px;">
+          This is an automated critical value notification from ${hospitalName}<br>
+          Generated on: ${new Date().toLocaleString()}
+        </p>
+      </div>
+    </div>
+  `;
+
+  return sendViaBrevo({
+    sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+    to: [{ email }],
+    subject: `🚨 CRITICAL VALUE ALERT - Report ${reportNumber}`,
+    htmlContent: html,
+    textContent: `CRITICAL VALUE ALERT: Patient ${patientName}, Report ${reportNumber}. Critical values detected requiring immediate attention.`
+  });
+};
+
+/**
+ * Send report delivery notification to patient
+ * @param {string} email - Patient email
+ * @param {string} patientName - Patient name
+ * @param {string} reportNumber - Report number
+ * @param {string} reportUrl - URL to view report
+ * @param {string} hospitalName - Hospital name
+ */
+export const sendReportDeliveryNotification = async (email, patientName, reportNumber, reportUrl, hospitalName) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+      <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2 style="color: #10b981; margin-top: 0;">📧 Your Diagnostic Report is Ready</h2>
+        <p>Dear <strong>${patientName}</strong>,</p>
+        
+        <p style="font-size: 16px; line-height: 1.6;">
+          Your diagnostic report is now available for viewing.
+        </p>
+        
+        <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #065f46;">
+            <strong>✓ Report Ready</strong><br>
+            Report Number: <strong>${reportNumber}</strong><br>
+            Generated: ${new Date().toLocaleString()}
+          </p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${reportUrl}" style="background-color: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+            View Your Report
+          </a>
+        </div>
+        
+        <h3 style="color: #333;">What's Next?</h3>
+        <ul style="color: #555; line-height: 1.8;">
+          <li>Click the button above to view your report online</li>
+          <li>You can download or print the report for your records</li>
+          <li>Share the report with your doctor if needed</li>
+          <li>Contact us if you have any questions about your results</li>
+        </ul>
+        
+        <div style="background-color: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #1e40af;">
+            <strong>ℹ️ Need Help?</strong> Contact ${hospitalName} for any questions about your report.
+          </p>
+        </div>
+        
+        <p style="color: #888; font-size: 12px; margin-top: 30px;">
+          ${hospitalName} | ${new Date().getFullYear()}<br>
+          This is an automated notification. Please do not reply to this email.
+        </p>
+      </div>
+    </div>
+  `;
+
+  return sendViaBrevo({
+    sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+    to: [{ email }],
+    subject: `📧 Your Diagnostic Report is Ready - ${reportNumber}`,
+    htmlContent: html,
+    textContent: `Dear ${patientName}, your diagnostic report ${reportNumber} is now ready. Visit ${reportUrl} to view your report.`
+  });
+};
+
+/**
+ * Send result released notification to patient
+ * @param {string} email - Patient email
+ * @param {string} patientName - Patient name
+ * @param {string} testName - Test name
+ * @param {string} reportNumber - Report/Result number
+ * @param {string} viewUrl - URL to view results
+ * @param {string} hospitalName - Hospital name
+ */
+export const sendResultReleasedNotification = async (email, patientName, testName, reportNumber, viewUrl, hospitalName) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+      <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2 style="color: #3b82f6; margin-top: 0;">🔬 Test Results Released</h2>
+        <p>Dear <strong>${patientName}</strong>,</p>
+        
+        <p style="font-size: 16px; line-height: 1.6;">
+          Your test results are now available for viewing.
+        </p>
+        
+        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #1e40af;">
+            <strong>✓ Results Available</strong><br>
+            Test: <strong>${testName}</strong><br>
+            Report #: ${reportNumber}<br>
+            Released: ${new Date().toLocaleString()}
+          </p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${viewUrl}" style="background-color: #3b82f6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+            View Results
+          </a>
+        </div>
+        
+        <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #92400e;">
+            <strong>⚠️ Important:</strong> Please consult with your doctor to interpret your test results properly.
+          </p>
+        </div>
+        
+        <p style="color: #888; font-size: 12px; margin-top: 30px;">
+          ${hospitalName} | ${new Date().getFullYear()}<br>
+          This is an automated notification.
+        </p>
+      </div>
+    </div>
+  `;
+
+  return sendViaBrevo({
+    sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+    to: [{ email }],
+    subject: `🔬 Test Results Released - ${testName}`,
+    htmlContent: html,
+    textContent: `Dear ${patientName}, your test results for ${testName} (Report #${reportNumber}) are now available. Visit ${viewUrl} to view your results.`
   });
 };
 
@@ -595,5 +786,28 @@ export default {
   sendTenantWelcomeEmail,
   sendTransactionalEmail,
   sendPasswordResetEmail,
-  sendPasswordChangedEmail
+  sendPasswordChangedEmail,
+  sendCriticalValueNotification,
+  sendReportDeliveryNotification,
+  sendResultReleasedNotification
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

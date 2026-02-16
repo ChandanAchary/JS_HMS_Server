@@ -1,4 +1,4 @@
-import crypto from "crypto";
+﻿import crypto from 'crypto';
 
 /**
  * Generate a secure random password
@@ -36,3 +36,23 @@ export function generateSecurePassword(length = 12) {
   }
   return arr.join("");
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

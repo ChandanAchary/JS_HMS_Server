@@ -10,7 +10,7 @@
  */
  
 import { PrismaClient } from '@prisma/client';
-import logger from '../utils/logger.js';
+import logger from '../../utils/logger.js';
 
 // Utility: Mask sensitive database URL in logs
 const maskDatabaseUrl = (url) => {
@@ -46,6 +46,9 @@ export function initializeTenantPrisma() {
     logger.info('[Tenant DB] Using Neon connection pooling endpoint');
   }
 
+  // Ensure Prisma picks up the possibly modified DATABASE_URL (pooler endpoint)
+  process.env.DATABASE_URL = dbUrl;
+
   tenantPrismaInstance = new PrismaClient({
     errorFormat: 'pretty',
     log: process.env.NODE_ENV === 'development' 
@@ -70,6 +73,8 @@ export function initializeTenantPrisma() {
     // CRITICAL: Set connection timeout at DATABASE_URL level
     if (!dbUrl.includes('?')) {
       dbUrl += `?connection_limit=${poolSize}&statement_timeout=30000&connect_timeout=10`;
+      // update env var as well
+      process.env.DATABASE_URL = dbUrl;
     }
   }
 
@@ -94,32 +99,51 @@ export function initializeTenantPrisma() {
 export const tenantPrisma = initializeTenantPrisma();
 
 export async function connectDB() {
-  const maxRetries = 3;
-  let retryCount = 0;
+  // Improved retry strategy with exponential backoff and jitter
+  const maxRetries = parseInt(process.env.DATABASE_CONNECT_RETRIES || '5', 10);
+  const allowOffline = process.env.DATABASE_ALLOW_OFFLINE === 'true' || 
+                       (process.env.NODE_ENV === 'development' && process.env.DATABASE_ALLOW_OFFLINE !== 'false');
+  let attempt = 0;
 
-  while (retryCount < maxRetries) {
+  while (attempt < maxRetries) {
     try {
-      // Test connection with retry logic
       await tenantPrisma.$queryRaw`SELECT 1`;
       logger.info('[Tenant DB] Connection successful');
       return true;
     } catch (error) {
-      retryCount++;
-      const isLastAttempt = retryCount === maxRetries;
-      
-      if (isLastAttempt) {
-        logger.error('[Tenant DB] Connection failed after 3 attempts:', error.message);
-        logger.error('[Tenant DB] Make sure:');
-        logger.error('  1. DATABASE_URL is set in .env file');
-        logger.error('  2. Database server is running and accessible');
-        logger.error('  3. Network connection is available');
-        logger.error('  4. Firewall is not blocking the connection');
+      attempt++;
+      const isLast = attempt === maxRetries;
+      const baseWait = Math.min(1000 * Math.pow(2, attempt - 1), 30000); // cap at 30s
+      const jitter = Math.floor(Math.random() * 1000);
+      const waitTime = baseWait + jitter;
+
+      logger.warn(`[Tenant DB] Connection attempt ${attempt} failed: ${error.message}`);
+
+      if (isLast) {
+        logger.error(`[Tenant DB] All ${maxRetries} connection attempts failed.`);
+        logger.error(`[Tenant DB] DATABASE_URL: ${maskDatabaseUrl(process.env.DATABASE_URL)}`);
+        logger.error('[Tenant DB] Troubleshooting suggestions:');
+        logger.error('  • Verify DATABASE_URL in your .env file is correct');
+        logger.error('  • Ensure the database server is running and accessible from this machine');
+        logger.error('  • If using Neon, ensure you are using the pooler endpoint and the network allows outbound TCP to the region');
+        logger.error('  • On Windows, test connectivity with PowerShell:');
+        logger.error('      $host = "ep-ancient-star-a1a0v0jx.ap-southeast-1.aws-pooler.neon.tech"');
+        logger.error('      Test-NetConnection -ComputerName $host -Port 5432');
+        logger.error('  • On *nix, test with:');
+        logger.error('      nc -vz <host> 5432');
+
+        // In development, allow continuing without DB connection
+        if (allowOffline) {
+          logger.warn('[Tenant DB] Running in offline development mode — database operations will fail at runtime');
+          logger.warn('[Tenant DB] To require DB connection, set DATABASE_ALLOW_OFFLINE=false in .env');
+          return false;
+        }
+
         throw error;
-      } else {
-        const waitTime = 1000 * retryCount;
-        logger.warn(`[Tenant DB] Connection attempt ${retryCount} failed, retrying in ${waitTime}ms...`);
-        await sleep(waitTime);
       }
+
+      logger.info(`[Tenant DB] Retrying in ${Math.round(waitTime)}ms...`);
+      await sleep(waitTime);
     }
   }
 }
@@ -137,3 +161,21 @@ export function getPrisma() {
   }
   return tenantPrismaInstance;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

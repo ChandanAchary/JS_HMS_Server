@@ -1,5 +1,5 @@
-import { tenantPrisma as prisma } from "../core/database/tenantDb.js";
-import { defaultDoctorFields, defaultEmployeeFields } from "../utils/defaultFormFields.js";
+﻿import { tenantPrisma as prisma } from '../core/database/tenantDb.js';
+import { defaultDoctorFields, defaultEmployeeFields } from '../utils/defaultFormFields.js';
 
 /**
  * Get default form schema for Doctor or Employee
@@ -158,3 +158,23 @@ export const validateFormSubmission = async (templateId, formData) => {
 
   return { isValid: errors.length === 0, errors };
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

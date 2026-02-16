@@ -4,25 +4,27 @@
  */
 
 import express from 'express';
-import logger from '../core/utils/logger.js';
+import logger from '../utils/logger.js';
 
 // Module Routes
-import { createAuthRoutes } from '../modules/auth/index.js';
-import { createPasswordRoutes } from '../modules/password/index.js';
-import { employeeRoutes } from '../modules/employee/index.js';
-import { doctorRoutes } from '../modules/doctor/index.js';
-import { patientRoutes } from '../modules/patient/index.js';
-import { attendanceRoutes } from '../modules/attendance/index.js';
-import { billingRoutes } from '../modules/billing/index.js';
-import { adminRoutes } from '../modules/admin/index.js';
-import { onboardingRoutes } from '../modules/onboarding/index.js';
-import { routes as publicRegistrationRoutes } from '../modules/publicRegistration/index.js';
-import { setupRoutes } from '../modules/setup/index.js';
-import { diagnosticsRoutes } from '../modules/diagnostics/index.js';
-import { departmentRoutes } from '../modules/department/index.js';
-import { queueRoutes } from '../modules/queue/index.js';
-import { visitRouter } from '../modules/visit/index.js';
-import { opdRoutes } from '../modules/opd/index.js';
+import { createAuthRoutes } from '../routes/auth.routes.js';
+import { createPasswordRoutes } from '../routes/password.routes.js';
+import { employeeRoutes } from '../routes/employee.routes.js';
+import { doctorRoutes } from '../routes/doctor.routes.js';
+import { patientRoutes } from '../routes/patient.routes.js';
+import { attendanceRoutes } from '../routes/attendance.routes.js';
+import { billingRoutes } from '../routes/billing.routes.js';
+import { adminRoutes } from '../routes/admin.routes.js';
+import { onboardingRoutes } from '../routes/onboarding.routes.js';
+import { routes as publicRegistrationRoutes } from '../routes/publicRegistration.routes.js';
+import { setupRoutes } from '../routes/setup.routes.js';
+import { diagnosticsRoutes } from '../routes/diagnostics.routes.js';
+import { departmentRoutes } from '../routes/department.routes.js';
+import { queueRoutes } from '../routes/queue.routes.js';
+import { visitRouter } from '../routes/visit.routes.js';
+import { opdRoutes } from '../routes/opd.routes.js';
+import { pharmacyRoutes } from '../routes/pharmacy.routes.js';
+import { reportRoutes } from '../routes/reports.routes.js';
 
 /**
  * Initialize all API routes
@@ -90,10 +92,16 @@ export function initializeApiRoutes(prisma) {
   // OPD (Out-Patient Department) routes - vitals, clinical notes, prescriptions (protected internally)
   router.use('/opd', opdRoutes);
 
+  // Pharmacy routes - drug catalog, inventory, dispensing (protected internally)
+  router.use('/pharmacy', pharmacyRoutes);
+
+  // Reports routes - analytics, auditing, clinical/financial reports (protected internally)
+  router.use('/reports', reportRoutes);
+
   // Admin routes (protected internally with adminOnly)
   router.use('/admin', adminRoutes);
 
-  logger.info('[API] Routes initialized - 16 modules mounted');
+  logger.info('[API] Routes initialized - 18 modules mounted');
 
   return router;
 }
@@ -119,6 +127,8 @@ export function getApiInfo() {
       'queue',
       'visits',
       'opd',
+      'pharmacy',
+      'reports',
       'departments',
       'admin',
       'onboarding',
@@ -126,3 +136,22 @@ export function getApiInfo() {
     ]
   };
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

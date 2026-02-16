@@ -6,18 +6,17 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import logger from './core/utils/logger.js';
+import logger from './utils/logger.js';
 import config from './core/config/environment.js';
-import { resolveTenant } from './core/middleware/resolveTenant.middleware.js';
-import { errorHandler } from './core/middleware/errorHandler.middleware.js';
+import { resolveTenant } from './middlewares/resolveTenant.middleware.js';
+import { errorHandler } from './middlewares/errorHandler.middleware.js';
 import { initializeApiRoutes, getApiInfo } from './api/index.js';
+import { setupSwagger } from './core/config/swaggerSetup.js';
 // Legacy single-route mounts to maintain backwards compatibility with older clients
-import { setupRoutes } from './modules/setup/index.js';
-import { ApiResponse } from './shared/dto/ApiResponse.js';
+import { setupRoutes } from './routes/setup.routes.js';
+import { ApiResponse } from './shared/ApiResponse.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
 
 /**
  * Create and configure Express application
@@ -48,29 +47,7 @@ export function createApp(prisma) {
     next();
   });
 
-  // ===== HEALTH CHECK ENDPOINTS (No auth required) =====
-  app.get('/', (req, res) => {
-    res.json({
-      message: 'Hospital Management System - Single Tenant Backend',
-      version: '1.0.0',
-      status: 'running',
-    });
-  });
 
-  app.get('/health', (req, res) => {
-    res.json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      environment: config.NODE_ENV,
-    });
-  });
-
-  app.get('/api/info', (req, res) => {
-    res.json({
-      success: true,
-      data: getApiInfo(),
-    });
-  });
 
   // ===== TENANT RESOLUTION MIDDLEWARE =====
   // Loads the single hospital and injects Prisma client
@@ -83,6 +60,20 @@ export function createApp(prisma) {
   // ===== API ROUTES =====
   // Mount API routes directly under /api
   app.use('/api', initializeApiRoutes(prisma));
+
+  // ===== SWAGGER DOCUMENTATION =====
+  // API documentation available at /api-docs
+  // JSON spec available at /api-spec.json
+  setupSwagger(app);
+
+  // Redirect legacy /setup requests to /api/setup while keeping mount
+  // This preserves backward compatibility and guides clients to the new API base.
+  app.use('/setup', (req, res, next) => {
+    // If request already points to /api, continue
+    if (req.originalUrl && req.originalUrl.startsWith('/api')) return next();
+    const target = '/api' + req.originalUrl;
+    return res.redirect(307, target);
+  });
 
   // Mount legacy setup routes at /setup for backwards compatibility
   app.use('/setup', setupRoutes);
@@ -110,3 +101,22 @@ export function createApp(prisma) {
 }
 
 export default createApp;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

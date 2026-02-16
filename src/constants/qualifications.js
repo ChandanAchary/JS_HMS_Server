@@ -87,3 +87,20 @@ export const DOCTOR_SPECIALIZATIONS = [
   "Sports Medicine",
   "Transfusion Medicine"
 ];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
