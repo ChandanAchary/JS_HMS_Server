@@ -6,7 +6,7 @@
 import { AttendanceService } from '../services/attendance.service.js';
 import { ApiResponse } from '../shared/ApiResponse.js';
 import { HttpStatus } from '../constants/HttpStatus.js';
-import { 
+import {
   formatTodayStatus,
   formatHistoryItem,
   formatCheckInResponse,
@@ -14,7 +14,7 @@ import {
   formatAdminSummaryItem,
   formatUserAttendanceDetails
 } from './attendance.validators.js';
-import { 
+import {
   validateCheckIn,
   validateCheckOut,
   parseLocationInput,
@@ -39,10 +39,10 @@ export const checkIn = async (req, res, next) => {
     const location = validateCheckIn(locationInput);
 
     const service = getService(req);
-    const { attendance, session } = await service.checkIn(userId, role, hospitalId, location, req.file);
+    const { attendance, session, distanceFromHospital } = await service.checkIn(userId, role, hospitalId, location, req.file);
 
     return res.status(HttpStatus.OK).json(
-      ApiResponse.success(formatCheckInResponse(attendance, session))
+      ApiResponse.success(formatCheckInResponse(attendance, session, distanceFromHospital))
     );
   } catch (error) {
     next(error);
@@ -62,10 +62,10 @@ export const checkOut = async (req, res, next) => {
     const location = validateCheckOut(locationInput);
 
     const service = getService(req);
-    const { attendanceId, session } = await service.checkOut(userId, role, hospitalId, location, req.file);
+    const { attendanceId, session, distanceFromHospital } = await service.checkOut(userId, role, hospitalId, location, req.file);
 
     return res.status(HttpStatus.OK).json(
-      ApiResponse.success(formatCheckOutResponse(attendanceId, session))
+      ApiResponse.success(formatCheckOutResponse(attendanceId, session, distanceFromHospital))
     );
   } catch (error) {
     next(error);

@@ -22,15 +22,15 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { 
-  AdminRepository, 
-  HospitalRepository, 
+import {
+  AdminRepository,
+  HospitalRepository,
   AssignmentRepository,
   FormTemplateRepository,
-  PayrollRepository 
+  PayrollRepository
 } from './admin.repository.js';
-import { 
-  formatAdminProfile, 
+import {
+  formatAdminProfile,
   formatAdminLoginResponse,
   formatHospitalProfile,
   formatEmployeeForAdmin,
@@ -42,7 +42,7 @@ import {
   formatFormTemplate,
   formatPayrollDetails
 } from '../controllers/admin.validators.js';
-import { 
+import {
   validateAdminRegister,
   validateAdminLogin,
   validateProfileUpdate,
@@ -53,12 +53,12 @@ import {
   validateFormRole,
   validatePayrollInput
 } from '../controllers/admin.validators.js';
-import { 
-  ValidationError, 
-  NotFoundError, 
-  UnauthorizedError, 
+import {
+  ValidationError,
+  NotFoundError,
+  UnauthorizedError,
   ForbiddenError,
-  ConflictError 
+  ConflictError
 } from '../shared/AppError.js';
 import { getFileUrl, deleteLocalFile } from '../utils/file.utils.js';
 import { getPermissionsForRole } from '../rbac/rolePermissions.js';
@@ -70,6 +70,7 @@ import { defaultDoctorFields, defaultEmployeeFields } from '../utils/defaultForm
 import { getDefaultFormSchema } from '../services/formTemplate.service.js';
 import { sendOtpEmail, sendLoginOtpConfirmation, sendTransactionalEmail } from '../services/email.service.js';
 import logger from '../utils/logger.js';
+import { getPostOfficesByPinCode } from '../services/pincode.service.js';
 
 // OTP expires in 10 minutes
 const OTP_EXPIRY_MINUTES = 10;
@@ -108,7 +109,7 @@ export class AdminService {
    */
   maskEmail(email) {
     const [local, domain] = email.split('@');
-    const maskedLocal = local.length > 2 
+    const maskedLocal = local.length > 2
       ? local[0] + '*'.repeat(local.length - 2) + local[local.length - 1]
       : local[0] + '*';
     return `${maskedLocal}@${domain}`;
@@ -270,7 +271,7 @@ export class AdminService {
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     await this.prisma.admin.update({
       where: { id: adminId },
-      data: { 
+      data: {
         password: hashedPassword,
         isPasswordChanged: false
       }
@@ -508,7 +509,7 @@ export class AdminService {
    */
   async getProfile(adminId, req = null) {
     const admin = await this.adminRepo.findByIdWithHospital(adminId);
-    
+
     if (!admin) {
       throw new NotFoundError('Admin not found');
     }
@@ -569,13 +570,13 @@ export class AdminService {
       throw new ValidationError('Failed to process uploaded file');
     }
 
-    const updated = await this.adminRepo.update(adminId, { 
-      profilePhoto: profilePhotoUrl 
+    const updated = await this.adminRepo.update(adminId, {
+      profilePhoto: profilePhotoUrl
     });
 
-    return { 
-      message: 'Profile photo updated', 
-      profilePhoto: updated.profilePhoto 
+    return {
+      message: 'Profile photo updated',
+      profilePhoto: updated.profilePhoto
     };
   }
 
@@ -716,8 +717,8 @@ export class AdminService {
    * Get all employees
    */
   async getAllEmployees(hospitalId) {
-    const employees = await this.prisma.employee.findMany({ 
-      where: { hospitalId } 
+    const employees = await this.prisma.employee.findMany({
+      where: { hospitalId }
     });
 
     const payrolls = await this.prisma.payroll.findMany({
@@ -750,8 +751,8 @@ export class AdminService {
    * Get all doctors
    */
   async getAllDoctors(hospitalId) {
-    const doctors = await this.prisma.doctor.findMany({ 
-      where: { hospitalId } 
+    const doctors = await this.prisma.doctor.findMany({
+      where: { hospitalId }
     });
 
     const payrolls = await this.prisma.payroll.findMany({
@@ -784,8 +785,8 @@ export class AdminService {
    * Get employee profile by admin
    */
   async getEmployeeProfile(employeeId, hospitalId) {
-    const employee = await this.prisma.employee.findUnique({ 
-      where: { id: employeeId } 
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId }
     });
 
     if (!employee) {
@@ -811,8 +812,8 @@ export class AdminService {
    * Get doctor profile by admin
    */
   async getDoctorProfile(doctorId, hospitalId) {
-    const doctor = await this.prisma.doctor.findUnique({ 
-      where: { id: doctorId } 
+    const doctor = await this.prisma.doctor.findUnique({
+      where: { id: doctorId }
     });
 
     if (!doctor) {
@@ -838,8 +839,8 @@ export class AdminService {
    * Delete employee
    */
   async deleteEmployee(employeeId, hospitalId) {
-    const employee = await this.prisma.employee.findUnique({ 
-      where: { id: employeeId } 
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId }
     });
 
     if (!employee || String(employee.hospitalId) !== String(hospitalId)) {
@@ -854,8 +855,8 @@ export class AdminService {
    * Delete doctor
    */
   async deleteDoctor(doctorId, hospitalId) {
-    const doctor = await this.prisma.doctor.findUnique({ 
-      where: { id: doctorId } 
+    const doctor = await this.prisma.doctor.findUnique({
+      where: { id: doctorId }
     });
 
     if (!doctor || String(doctor.hospitalId) !== String(hospitalId)) {
@@ -872,8 +873,8 @@ export class AdminService {
   async updateEmployeeSalary(employeeId, salary, hospitalId) {
     const validSalary = validateSalaryUpdate(salary);
 
-    const employee = await this.prisma.employee.findUnique({ 
-      where: { id: employeeId } 
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId }
     });
 
     if (!employee || String(employee.hospitalId) !== String(hospitalId)) {
@@ -892,8 +893,8 @@ export class AdminService {
   async updateDoctorSalary(doctorId, salary, hospitalId) {
     const validSalary = validateSalaryUpdate(salary);
 
-    const doctor = await this.prisma.doctor.findUnique({ 
-      where: { id: doctorId } 
+    const doctor = await this.prisma.doctor.findUnique({
+      where: { id: doctorId }
     });
 
     if (!doctor || String(doctor.hospitalId) !== String(hospitalId)) {
@@ -935,16 +936,16 @@ export class AdminService {
     try {
       totalPatientsServed = await this.prisma.patient.count({ where: { hospitalId } });
       if (!totalPatientsServed) {
-        const bills = await this.prisma.bill.findMany({ 
-          where: { hospitalId }, 
-          select: { patientId: true } 
+        const bills = await this.prisma.bill.findMany({
+          where: { hospitalId },
+          select: { patientId: true }
         });
         totalPatientsServed = new Set(bills.map(b => b.patientId)).size;
       }
     } catch {
-      const bills = await this.prisma.bill.findMany({ 
-        where: { hospitalId }, 
-        select: { patientId: true } 
+      const bills = await this.prisma.bill.findMany({
+        where: { hospitalId },
+        select: { patientId: true }
       });
       totalPatientsServed = new Set(bills.map(b => b.patientId)).size;
     }
@@ -1019,7 +1020,7 @@ export class AdminService {
       return acc;
     }, {});
 
-    const employees = employeesDocs.map(e => 
+    const employees = employeesDocs.map(e =>
       formatPresentTodayItem(e, attMap[String(e.id)], false)
     );
 
@@ -1083,7 +1084,7 @@ export class AdminService {
       where: { id: userId },
       select: { delegatedPermissions: true, hospitalId: true }
     });
-    
+
     if (!user) {
       user = await this.prisma.doctor.findUnique({
         where: { id: userId },
@@ -1174,6 +1175,142 @@ export class AdminService {
     return { message: 'Hospital logo updated', logo: updated.logo };
   }
 
+  // ==================== GEOFENCE SETTINGS ====================
+
+  /**
+   * Get geofence settings for the hospital
+   */
+  async getGeofenceSettings(hospitalId) {
+    if (!hospitalId) {
+      throw new ValidationError('Admin not associated with a hospital');
+    }
+
+    const hospital = await this.hospitalRepo.findById(hospitalId);
+    if (!hospital) {
+      throw new NotFoundError('Hospital not found');
+    }
+
+    return {
+      latitude: hospital.latitude,
+      longitude: hospital.longitude,
+      pinCode: hospital.pinCode,
+      geofenceRadiusMeters: hospital.geofenceRadiusMeters,
+      geofenceEnabled: hospital.geofenceEnabled,
+      address: hospital.address,
+      city: hospital.city,
+      state: hospital.state,
+      country: hospital.country
+    };
+  }
+
+  /**
+   * Update geofence settings for the hospital
+   */
+  async updateGeofenceSettings(hospitalId, data) {
+    if (!hospitalId) {
+      throw new ValidationError('Admin not associated with a hospital');
+    }
+
+    const hospital = await this.hospitalRepo.findById(hospitalId);
+    if (!hospital) {
+      throw new NotFoundError('Hospital not found');
+    }
+
+    const updateData = {};
+
+    // Update latitude/longitude
+    if (data.latitude !== undefined) {
+      const lat = parseFloat(data.latitude);
+      if (isNaN(lat) || lat < -90 || lat > 90) {
+        throw new ValidationError('Invalid latitude. Must be between -90 and 90.');
+      }
+      updateData.latitude = lat;
+    }
+
+    if (data.longitude !== undefined) {
+      const lng = parseFloat(data.longitude);
+      if (isNaN(lng) || lng < -180 || lng > 180) {
+        throw new ValidationError('Invalid longitude. Must be between -180 and 180.');
+      }
+      updateData.longitude = lng;
+    }
+
+    // Update PIN code
+    if (data.pinCode !== undefined) {
+      updateData.pinCode = String(data.pinCode).trim();
+    }
+
+    // Update geofence radius
+    if (data.geofenceRadiusMeters !== undefined) {
+      const radius = parseInt(data.geofenceRadiusMeters, 10);
+      if (isNaN(radius) || radius < 10 || radius > 5000) {
+        throw new ValidationError('Geofence radius must be between 10 and 5000 meters.');
+      }
+      updateData.geofenceRadiusMeters = radius;
+    }
+
+    // Enable/disable geofencing
+    if (data.geofenceEnabled !== undefined) {
+      const enable = Boolean(data.geofenceEnabled);
+
+      // Safety check: can't enable geofencing if lat/lng are still 0,0
+      if (enable) {
+        const finalLat = updateData.latitude ?? hospital.latitude;
+        const finalLng = updateData.longitude ?? hospital.longitude;
+        if (finalLat === 0 && finalLng === 0) {
+          throw new ValidationError(
+            'Cannot enable geofencing: hospital GPS coordinates (latitude/longitude) must be set first. ' +
+            'Please update the hospital coordinates before enabling geofencing.'
+          );
+        }
+      }
+
+      updateData.geofenceEnabled = enable;
+    }
+
+    const updated = await this.hospitalRepo.update(hospitalId, updateData);
+
+    logger.info(`[Admin] Geofence settings updated for hospital ${hospitalId}`);
+
+    return {
+      message: 'Geofence settings updated',
+      geofence: {
+        latitude: updated.latitude,
+        longitude: updated.longitude,
+        pinCode: updated.pinCode,
+        geofenceRadiusMeters: updated.geofenceRadiusMeters,
+        geofenceEnabled: updated.geofenceEnabled
+      }
+    };
+  }
+
+  /**
+   * Lookup postal PIN code using the India Postal PIN Code API
+   */
+  async lookupPinCode(pincode) {
+    const result = await getPostOfficesByPinCode(pincode);
+
+    if (result.status !== 'Success' || !result.postOffices) {
+      throw new NotFoundError(result.message || 'No post offices found for the given PIN code');
+    }
+
+    return {
+      pinCode: String(pincode),
+      message: result.message,
+      postOffices: result.postOffices.map(po => ({
+        name: po.Name,
+        branchType: po.BranchType,
+        deliveryStatus: po.DeliveryStatus,
+        district: po.District,
+        division: po.Division,
+        region: po.Region,
+        state: po.State,
+        country: po.Country,
+        circle: po.Circle
+      }))
+    };
+  }
+
   // ==================== ASSIGNMENTS ====================
 
   /**
@@ -1201,8 +1338,8 @@ export class AdminService {
 
     // Check overlap
     const existing = await this.assignmentRepo.findByAssignee(
-      hospitalId, 
-      data.assigneeType, 
+      hospitalId,
+      data.assigneeType,
       data.assigneeId
     );
 

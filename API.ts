@@ -25,7 +25,7 @@ export const API_ROUTES = {
     CHANGE_PASSWORD: `${BASE_URL}/auth/change-password`,
     GET_PROFILE: `${BASE_URL}/auth/me`,
     DEBUG: `${BASE_URL}/auth/debug`,
-    
+
     // Role-specific login (legacy)
     ROLE_LOGIN: (role: string) => `${BASE_URL}/auth/${role}/login`,
   },
@@ -38,19 +38,19 @@ export const API_ROUTES = {
     AUTH_LOGIN: `${BASE_URL}/admin/auth/login`,
     AUTH_VERIFY_LOGIN_OTP: (sessionId: string) => `${BASE_URL}/admin/auth/verify-login-otp/${sessionId}`,
     AUTH_RESEND_LOGIN_OTP: (sessionId: string) => `${BASE_URL}/admin/auth/resend-login-otp/${sessionId}`,
-    
+
     // Profile Management
     GET_PROFILE: `${BASE_URL}/admin/profile`,
     UPDATE_PROFILE: `${BASE_URL}/admin/profile`,
     INITIATE_PROFILE_UPDATE: `${BASE_URL}/admin/profile/initiate-update`,
     VERIFY_PROFILE_UPDATE: (sessionId: string) => `${BASE_URL}/admin/profile/verify-update/${sessionId}`,
     UPDATE_PROFILE_PHOTO: `${BASE_URL}/admin/profile/photo`,
-    
+
     // Admin Management (SUPER_ADMIN only)
     CREATE_ADMIN: `${BASE_URL}/admin/create-admin`,
     DELETE_ADMIN: (id: string) => `${BASE_URL}/admin/${id}`,
     RESEND_CREDENTIALS: (id: string) => `${BASE_URL}/admin/${id}/resend-credentials`,
-    
+
     // Staff Management
     GET_EMPLOYEES: `${BASE_URL}/admin/employees`,
     GET_DOCTORS: `${BASE_URL}/admin/doctors`,
@@ -60,25 +60,31 @@ export const API_ROUTES = {
     DELETE_DOCTOR: (id: string) => `${BASE_URL}/admin/doctor/${id}`,
     UPDATE_EMPLOYEE_SALARY: (id: string) => `${BASE_URL}/admin/employee/${id}/salary`,
     UPDATE_DOCTOR_SALARY: (id: string) => `${BASE_URL}/admin/doctor/${id}/salary`,
-    
+
     // Dashboard & Analytics
     GET_DASHBOARD_SUMMARY: `${BASE_URL}/admin/dashboard-summary`,
     GET_TODAY_ATTENDANCE: `${BASE_URL}/admin/attendance/today-summary`,
     GET_PRESENT_TODAY: `${BASE_URL}/admin/present-today`,
-    
+
     // Permissions
     SET_DELEGATED_PERMISSIONS: (userId: string) => `${BASE_URL}/admin/users/${userId}/delegated-permissions`,
     GET_DELEGATED_PERMISSIONS: (userId: string) => `${BASE_URL}/admin/users/${userId}/delegated-permissions`,
-    
+
     // Hospital Profile
     GET_HOSPITAL_PROFILE: `${BASE_URL}/admin/hospital-profile`,
     UPDATE_HOSPITAL_PROFILE: `${BASE_URL}/admin/hospital-profile`,
     UPDATE_HOSPITAL_LOGO: `${BASE_URL}/admin/hospital-profile/logo`,
-    
+
+    // Geofence Settings
+    GET_GEOFENCE_SETTINGS: `${BASE_URL}/admin/geofence-settings`,
+    UPDATE_GEOFENCE_SETTINGS: `${BASE_URL}/admin/geofence-settings`,
+    PINCODE_LOOKUP: (pincode: string) => `${BASE_URL}/admin/pincode-lookup/${pincode}`,
+
+
     // Assignments
     CREATE_ASSIGNMENT: `${BASE_URL}/admin/assignments`,
     GET_ASSIGNMENTS: `${BASE_URL}/admin/assignments`,
-    
+
     // Form Templates
     GET_DEFAULT_SCHEMA: (role: string) => `${BASE_URL}/admin/forms/default-schema/${role}`,
     INITIALIZE_FORM: (role: string) => `${BASE_URL}/admin/forms/initialize/${role}`,
@@ -100,7 +106,7 @@ export const API_ROUTES = {
     UPDATE_PROFILE_PIC: `${BASE_URL}/employees/profile`,
     DELETE_ACCOUNT: `${BASE_URL}/employees/profile`,
     LOGOUT: `${BASE_URL}/employees/logout`,
-    
+
     // Admin endpoints
     LIST_ALL: `${BASE_URL}/employees`,
     LIST_PAGINATED: `${BASE_URL}/employees/paginated`,
@@ -120,7 +126,7 @@ export const API_ROUTES = {
     UPDATE_PROFILE_PIC: `${BASE_URL}/doctors/profile`,
     DELETE_ACCOUNT: `${BASE_URL}/doctors/profile`,
     LOGOUT: `${BASE_URL}/doctors/logout`,
-    
+
     // Admin endpoints
     LIST_ALL: `${BASE_URL}/doctors`,
     LIST_PAGINATED: `${BASE_URL}/doctors/paginated`,
@@ -146,18 +152,18 @@ export const API_ROUTES = {
   BILLING: {
     LOGIN: `${BASE_URL}/billing/login`,
     GET_CATALOG: `${BASE_URL}/billing/catalog`,
-    
+
     // Patient Management
     CREATE_PATIENT: `${BASE_URL}/billing/patients`,
     SEARCH_PATIENTS: `${BASE_URL}/billing/patients/search`,
     GET_PATIENT: (patientId: string) => `${BASE_URL}/billing/patients/${patientId}`,
-    
+
     // Bill Management
     CREATE_BILL: (patientId: string) => `${BASE_URL}/billing/patients/${patientId}/bills`,
     LIST_BILLS: (patientId: string) => `${BASE_URL}/billing/patients/${patientId}/bills`,
     GET_BILL: (billId: string) => `${BASE_URL}/billing/bills/${billId}`,
     GET_BILL_BY_PATIENT: (patientId: string, billId: string) => `${BASE_URL}/billing/patients/${patientId}/bills/${billId}`,
-    
+
     // Payments
     RECEIVE_PAYMENT: (billId: string) => `${BASE_URL}/billing/bills/${billId}/payment`,
   },
@@ -167,28 +173,28 @@ export const API_ROUTES = {
   // =========================
   OPD: {
     LOGIN: `${BASE_URL}/opd/login`,
-    
+
     // Dashboard
     GET_DASHBOARD: `${BASE_URL}/opd/dashboard`,
     GET_QUEUE_DISPLAY: `${BASE_URL}/opd/queue-display`,
-    
+
     // Vitals
     RECORD_VITALS: `${BASE_URL}/opd/vitals/record`,
     GET_VITALS: (patientId: string) => `${BASE_URL}/opd/vitals/${patientId}`,
-    
+
     // Consultation
     CREATE_CONSULTATION: `${BASE_URL}/opd/consultation/create`,
     GET_CONSULTATION: (consultationId: string) => `${BASE_URL}/opd/consultation/${consultationId}`,
     UPDATE_CONSULTATION: (consultationId: string) => `${BASE_URL}/opd/consultation/${consultationId}`,
-    
+
     // Prescriptions
     CREATE_PRESCRIPTION: `${BASE_URL}/opd/prescription/create`,
     GET_PRESCRIPTIONS: (consultationId: string) => `${BASE_URL}/opd/prescriptions/${consultationId}`,
-    
+
     // Test Orders
     CREATE_TEST_ORDER: `${BASE_URL}/opd/test-order/create`,
     GET_TEST_ORDERS: (patientId: string) => `${BASE_URL}/opd/test-orders/${patientId}`,
-    
+
     // Patient History
     GET_PATIENT_HISTORY: (patientId: string) => `${BASE_URL}/opd/patient-history/${patientId}`,
   },
@@ -201,51 +207,51 @@ export const API_ROUTES = {
     CREATE_ADMISSION: `${BASE_URL}/ipd/admissions`,
     GET_ADMISSION: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}`,
     LIST_ADMISSIONS: `${BASE_URL}/ipd/admissions`,
-    
+
     // Vital Signs
     RECORD_VITALS: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/vitals`,
     GET_VITALS: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/vitals`,
     GET_VITALS_TREND: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/vitals/trend`,
     START_MONITORING: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/monitoring/start`,
-    
+
     // Clinical Orders
     CREATE_ORDER: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/orders`,
     GET_ORDERS: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/orders`,
     RECORD_MEDICATION_ADMINISTRATION: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/medications/administration`,
-    
+
     // Clinical Notes
     CREATE_PROGRESS_NOTE: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/notes`,
     GET_PROGRESS_NOTES: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/notes`,
-    
+
     // Assessments
     CREATE_ASSESSMENT: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/assessments`,
-    
+
     // Discharge Summary
     CREATE_DISCHARGE_SUMMARY: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/discharge-summary`,
-    
+
     // Alerts
     CREATE_ALERT: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/alerts`,
     GET_ALERTS: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/alerts`,
     ACKNOWLEDGE_ALERT: (alertId: string) => `${BASE_URL}/ipd/alerts/${alertId}/acknowledge`,
-    
+
     // Consents
     CREATE_CONSENT: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/consents`,
     GET_CONSENTS: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/consents`,
     SIGN_CONSENT: (consentId: string) => `${BASE_URL}/ipd/consents/${consentId}/sign`,
-    
+
     // Patient Movement
     RECORD_ENTRY: (admissionId: string, wardId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/wards/${wardId}/entry`,
     TRANSFER_PATIENT: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/transfer`,
     DISCHARGE_PATIENT: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/discharge`,
     GET_PATIENT_LOCATION: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/location`,
-    
+
     // Bed Management
     GET_BED_STATUS: (wardId: string) => `${BASE_URL}/ipd/wards/${wardId}/beds`,
     UPDATE_BED_STATUS: (bedId: string) => `${BASE_URL}/ipd/beds/${bedId}/status`,
-    
+
     // Census
     GET_WARD_CENSUS: (wardId: string) => `${BASE_URL}/ipd/wards/${wardId}/census`,
-    
+
     // Dashboard
     GET_ADMISSION_DASHBOARD: (admissionId: string) => `${BASE_URL}/ipd/admissions/${admissionId}/dashboard`,
     GET_WARD_DASHBOARD: (wardId: string) => `${BASE_URL}/ipd/wards/${wardId}/dashboard`,
@@ -264,7 +270,7 @@ export const API_ROUTES = {
     DELETE_TEST: (testId: string) => `${BASE_URL}/diagnostics/tests/${testId}`,
     GET_TEST_ENTRY_FORM: (testId: string) => `${BASE_URL}/diagnostics/tests/${testId}/entry-form`,
     GET_REPORT_PRINT_CONFIG: `${BASE_URL}/diagnostics/report-print-config`,
-    
+
     // Diagnostic Orders
     GET_ALL_ORDERS: `${BASE_URL}/diagnostics/orders`,
     GET_ORDER: (orderId: string) => `${BASE_URL}/diagnostics/orders/${orderId}`,
@@ -272,12 +278,12 @@ export const API_ROUTES = {
     CREATE_SELF_INITIATED_ORDER: `${BASE_URL}/diagnostics/orders/self-initiated`,
     CANCEL_ORDER: (orderId: string) => `${BASE_URL}/diagnostics/orders/${orderId}/cancel`,
     GET_PATIENT_ORDERS: (patientId: string) => `${BASE_URL}/diagnostics/patients/${patientId}/orders`,
-    
+
     // Sample Collection
     GET_PENDING_COLLECTIONS: `${BASE_URL}/diagnostics/collection/pending`,
     COLLECT_SAMPLE: `${BASE_URL}/diagnostics/collection/collect`,
     REJECT_SAMPLE: (orderItemId: string) => `${BASE_URL}/diagnostics/collection/${orderItemId}/reject`,
-    
+
     // Results Management
     ENTER_RESULT: `${BASE_URL}/diagnostics/results/enter`,
     QC_CHECK_RESULT: `${BASE_URL}/diagnostics/results/qc-check`,
@@ -286,20 +292,20 @@ export const API_ROUTES = {
     GET_PENDING_QC_RESULTS: `${BASE_URL}/diagnostics/results/pending-qc`,
     GET_PENDING_REVIEW_RESULTS: `${BASE_URL}/diagnostics/results/pending-review`,
     GET_PATIENT_RESULTS: (patientId: string) => `${BASE_URL}/diagnostics/patients/${patientId}/results`,
-    
+
     // External Prescriptions
     UPLOAD_PRESCRIPTION: `${BASE_URL}/diagnostics/prescription/upload`,
     MAP_PRESCRIPTION_TESTS: (prescriptionId: string) => `${BASE_URL}/diagnostics/prescription/${prescriptionId}/map-tests`,
-    
+
     // Lab Slots
     GENERATE_SLOTS: `${BASE_URL}/diagnostics/slots/generate`,
     GET_AVAILABLE_SLOTS: `${BASE_URL}/diagnostics/slots/available`,
     BOOK_SLOT: `${BASE_URL}/diagnostics/slots/book`,
-    
+
     // Reports
     GET_DAILY_SUMMARY: `${BASE_URL}/diagnostics/reports/daily-summary`,
     GET_TAT_ANALYSIS: `${BASE_URL}/diagnostics/reports/tat-analysis`,
-    
+
     // Billing Integration
     ADD_TO_BILL: (orderId: string) => `${BASE_URL}/diagnostics/billing/${orderId}/add-to-bill`,
     GET_BILL_CHARGES: (billId: string) => `${BASE_URL}/diagnostics/billing/${billId}/charges`,
@@ -318,23 +324,23 @@ export const API_ROUTES = {
     GET_DRUG: (drugId: string) => `${BASE_URL}/pharmacy/drugs/${drugId}`,
     UPDATE_DRUG: (drugId: string) => `${BASE_URL}/pharmacy/drugs/${drugId}`,
     DELETE_DRUG: (drugId: string) => `${BASE_URL}/pharmacy/drugs/${drugId}`,
-    
+
     // Inventory Management
     GET_INVENTORY_BY_DRUG: (drugId: string) => `${BASE_URL}/pharmacy/inventory/drug/${drugId}`,
     GET_INVENTORY: `${BASE_URL}/pharmacy/inventory`,
     ADD_INVENTORY: `${BASE_URL}/pharmacy/inventory`,
     UPDATE_INVENTORY: (inventoryId: string) => `${BASE_URL}/pharmacy/inventory/${inventoryId}`,
-    
+
     // Transactions
     GET_TRANSACTIONS: `${BASE_URL}/pharmacy/transactions`,
     GET_LOW_STOCK_ALERTS: `${BASE_URL}/pharmacy/alerts/low-stock`,
     GET_EXPIRING_DRUGS: `${BASE_URL}/pharmacy/alerts/expiring`,
-    
+
     // Prescription Dispensing
     DISPENSE_PRESCRIPTION: `${BASE_URL}/pharmacy/dispense`,
     GET_DISPENSES: `${BASE_URL}/pharmacy/dispenses`,
     GET_DISPENSE: (dispenseId: string) => `${BASE_URL}/pharmacy/dispenses/${dispenseId}`,
-    
+
     // Reports
     GET_INVENTORY_REPORT: `${BASE_URL}/pharmacy/reports/inventory-status`,
     GET_STOCK_MOVEMENT_REPORT: `${BASE_URL}/pharmacy/reports/stock-movement`,
@@ -353,12 +359,12 @@ export const API_ROUTES = {
     TOGGLE_SERVICE_QUEUE: (id: string) => `${BASE_URL}/queue/service-queues/${id}/toggle`,
     GET_QUEUE_DISPLAY: (id: string) => `${BASE_URL}/queue/service-queues/${id}/display`,
     CALL_NEXT_PATIENT: (id: string) => `${BASE_URL}/queue/service-queues/${id}/call-next`,
-    
+
     // Patient Queue Operations
     CHECK_IN_PATIENT: `${BASE_URL}/queue/check-in`,
     AUTO_QUEUE: `${BASE_URL}/queue/auto-queue`,
     GET_PATIENT_QUEUES: (patientId: string) => `${BASE_URL}/queue/patient/${patientId}`,
-    
+
     // Queue Entry Operations
     GET_QUEUE_STATUS: (id: string) => `${BASE_URL}/queue/entries/${id}/status`,
     START_SERVING: (id: string) => `${BASE_URL}/queue/entries/${id}/start-serving`,
@@ -368,11 +374,11 @@ export const API_ROUTES = {
     TRANSFER_PATIENT: (id: string) => `${BASE_URL}/queue/entries/${id}/transfer`,
     CANCEL_PATIENT: (id: string) => `${BASE_URL}/queue/entries/${id}/cancel`,
     CHANGE_PRIORITY: (id: string) => `${BASE_URL}/queue/entries/${id}/change-priority`,
-    
+
     // Analytics
     GET_ANALYTICS: `${BASE_URL}/queue/analytics`,
     RESET_DAILY_QUEUES: `${BASE_URL}/queue/reset-daily`,
-    
+
     // Public Routes (No Auth)
     PUBLIC_QUEUE_DISPLAY: (queueCode: string) => `${BASE_URL}/queue/public/display/${queueCode}`,
     PUBLIC_QUEUE_STATUS: (queueNumber: string) => `${BASE_URL}/queue/public/status/${queueNumber}`,
@@ -386,7 +392,7 @@ export const API_ROUTES = {
     GET_ALL_VISITS: `${BASE_URL}/visits`,
     GET_VISIT: (visitId: string) => `${BASE_URL}/visits/${visitId}`,
     UPDATE_VISIT_STATUS: (visitId: string) => `${BASE_URL}/visits/${visitId}/status`,
-    
+
     // Queue Endpoints
     GET_OPD_QUEUE: `${BASE_URL}/visits/queue/opd`,
     GET_IPD_QUEUE: `${BASE_URL}/visits/queue/ipd`,
@@ -402,26 +408,26 @@ export const API_ROUTES = {
     GET_VISIT_STATISTICS: `${BASE_URL}/reports/patient/visit-statistics`,
     GET_DEMOGRAPHICS: `${BASE_URL}/reports/patient/demographics`,
     GET_BILLING_SUMMARY: `${BASE_URL}/reports/patient/billing-summary`,
-    
+
     // Clinical Reports
     GET_OPD_ANALYSIS: `${BASE_URL}/reports/clinical/opd-analysis`,
     GET_IPD_OCCUPANCY: `${BASE_URL}/reports/clinical/ipd-occupancy`,
     GET_DIAGNOSTIC_STATS: `${BASE_URL}/reports/clinical/diagnostic-stats`,
-    
+
     // Financial Reports
     GET_REVENUE_REPORT: `${BASE_URL}/reports/financial/revenue`,
     GET_OUTSTANDING_BILLS: `${BASE_URL}/reports/financial/outstanding-bills`,
     GET_SERVICE_REVENUE: `${BASE_URL}/reports/financial/service-revenue`,
-    
+
     // Staff Reports
     GET_ATTENDANCE_SUMMARY: `${BASE_URL}/reports/staff/attendance-summary`,
     GET_STAFF_PERFORMANCE: `${BASE_URL}/reports/staff/performance`,
-    
+
     // Audit Reports
     GET_AUDIT_LOGS: `${BASE_URL}/reports/audit/activity-logs`,
     GET_USER_ACTIVITY: `${BASE_URL}/reports/audit/user-activity`,
     GET_SYSTEM_EVENTS: `${BASE_URL}/reports/audit/system-events`,
-    
+
     // Export
     EXPORT_CSV: `${BASE_URL}/reports/export/csv`,
     EXPORT_PDF: `${BASE_URL}/reports/export/pdf`,
@@ -617,10 +623,10 @@ export function buildUrl(path: string, query?: Record<string, any>): string {
  * Get authorization header
  */
 export function getAuthHeader(): Record<string, string> {
-  const token = typeof window !== 'undefined' 
+  const token = typeof window !== 'undefined'
     ? localStorage.getItem(LOCAL_STORAGE_KEYS.AUTH_TOKEN)
     : null;
-  
+
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

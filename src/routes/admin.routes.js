@@ -88,6 +88,11 @@ router.get('/hospital-profile', adminController.getHospitalProfile);
 router.put('/hospital-profile', adminController.updateHospitalProfile);
 router.put('/hospital-profile/logo', upload.single('logo'), uploadToCloudinary, adminController.updateHospitalLogo);
 
+// ==================== GEOFENCE SETTINGS ====================
+router.get('/geofence-settings', adminController.getGeofenceSettings);
+router.put('/geofence-settings', adminController.updateGeofenceSettings);
+router.get('/pincode-lookup/:pincode', adminController.lookupPinCode);
+
 // ==================== ASSIGNMENTS ====================
 router.post('/assignments', adminController.createAssignment);
 router.get('/assignments', adminController.getAssignmentsForUser);

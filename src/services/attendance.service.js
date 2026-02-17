@@ -4,19 +4,55 @@
  */
 
 import { AttendanceRepository, AttendanceSessionRepository } from './attendance.repository.js';
-import { 
+import {
   ValidationError,
-  NotFoundError 
+  NotFoundError
 } from '../shared/AppError.js';
 import { calculateAttendanceStatus } from '../services/attendanceStatus.service.js';
 import { localDateString } from '../utils/date.utils.js';
 import { getFileUrl } from '../utils/file.utils.js';
+import { isWithinGeofence } from '../utils/geofence.utils.js';
 
 export class AttendanceService {
   constructor(prisma) {
     this.prisma = prisma;
     this.attendanceRepo = new AttendanceRepository(prisma);
     this.sessionRepo = new AttendanceSessionRepository(prisma);
+  }
+
+  /**
+   * Validate that the user is within the hospital geofence.
+   * Skips validation if geofencing is disabled.
+   * @param {string} hospitalId
+   * @param {number} userLat
+   * @param {number} userLng
+   * @param {string} action - 'check-in' or 'check-out'
+   * @returns {Promise<{ distanceMeters: number } | null>} distance info or null if geofencing disabled
+   */
+  async validateGeofence(hospitalId, userLat, userLng, action = 'check-in') {
+    const hospital = await this.prisma.hospital.findUnique({
+      where: { id: hospitalId },
+      select: { latitude: true, longitude: true, geofenceEnabled: true, geofenceRadiusMeters: true }
+    });
+
+    if (!hospital || !hospital.geofenceEnabled) {
+      return null; // Geofencing not enabled, skip validation
+    }
+
+    const result = isWithinGeofence(
+      userLat, userLng,
+      hospital.latitude, hospital.longitude,
+      hospital.geofenceRadiusMeters
+    );
+
+    if (!result.allowed) {
+      throw new ValidationError(
+        `You are ${result.distanceMeters}m away from the hospital. ` +
+        `${action === 'check-in' ? 'Check-in' : 'Check-out'} is allowed only within ${hospital.geofenceRadiusMeters}m radius.`
+      );
+    }
+
+    return result;
   }
 
   /**
@@ -37,25 +73,28 @@ export class AttendanceService {
    * Check-in user
    */
   async checkIn(userId, role, hospitalId, location, file = null) {
+    // Geofence enforcement
+    const geofenceResult = await this.validateGeofence(hospitalId, location.latitude, location.longitude, 'check-in');
+
     const today = this.getTodayStr();
     const isDoctor = this.isDoctor(role);
 
     // Find or create attendance record
     let attendance = await this.attendanceRepo.findTodayAttendance(userId, today, hospitalId, isDoctor);
-    
+
     if (!attendance) {
       const createData = {
         role: role || 'EMPLOYEE',
         date: today,
         hospitalId
       };
-      
+
       if (isDoctor) {
         createData.doctorId = userId;
       } else {
         createData.employeeId = userId;
       }
-      
+
       attendance = await this.attendanceRepo.create(createData);
     }
 
@@ -87,13 +126,20 @@ export class AttendanceService {
       }
     }
 
-    return { attendance, session };
+    return {
+      attendance,
+      session,
+      distanceFromHospital: geofenceResult ? geofenceResult.distanceMeters : null
+    };
   }
 
   /**
    * Check-out user
    */
   async checkOut(userId, role, hospitalId, location, file = null) {
+    // Geofence enforcement
+    const geofenceResult = await this.validateGeofence(hospitalId, location.latitude, location.longitude, 'check-out');
+
     const today = this.getTodayStr();
     const isDoctor = this.isDoctor(role);
 
@@ -135,7 +181,11 @@ export class AttendanceService {
       totalWorkingMinutes: (attendance.totalWorkingMinutes || 0) + durationMinutes
     });
 
-    return { attendanceId: attendance.id, session: updatedSession };
+    return {
+      attendanceId: attendance.id,
+      session: updatedSession,
+      distanceFromHospital: geofenceResult ? geofenceResult.distanceMeters : null
+    };
   }
 
   /**
@@ -146,8 +196,8 @@ export class AttendanceService {
     const isDoctor = this.isDoctor(role);
 
     const attendance = await this.attendanceRepo.findTodayAttendance(userId, today, hospitalId, isDoctor);
-    const sessions = attendance 
-      ? await this.sessionRepo.findByAttendanceId(attendance.id) 
+    const sessions = attendance
+      ? await this.sessionRepo.findByAttendanceId(attendance.id)
       : [];
 
     const statusInfo = calculateAttendanceStatus(sessions);
@@ -227,11 +277,11 @@ export class AttendanceService {
 
     // Build summary
     const summary = Object.values(userMap).map(user => {
-      const todayRecord = todayRecords.find(r => 
+      const todayRecord = todayRecords.find(r =>
         r.employeeId === user.userId || r.doctorId === user.userId
       );
-      const sessions = todayRecord 
-        ? allSessions.filter(s => s.attendanceId === todayRecord.id) 
+      const sessions = todayRecord
+        ? allSessions.filter(s => s.attendanceId === todayRecord.id)
         : [];
       const statusInfo = calculateAttendanceStatus(sessions);
 

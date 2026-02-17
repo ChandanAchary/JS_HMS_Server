@@ -37,11 +37,11 @@ import { HttpStatus } from '../constants/HttpStatus.js';
 export const createAdmin = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
-    
+
     // Validate admin registration including password confirmation
     const { validateAdminRegister } = await import('./admin.validators.js');
     validateAdminRegister(req.body);
-    
+
     const sendCredentials = req.body.sendCredentials === true;
     const result = await service.createAdmin(
       req.body,
@@ -49,7 +49,7 @@ export const createAdmin = async (req, res, next) => {
       req.user.hospitalId,
       sendCredentials
     );
-    
+
     return res.status(HttpStatus.CREATED).json(
       ApiResponse.success(result, 'Admin created successfully')
     );
@@ -68,7 +68,7 @@ export const loginAdmin = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.initiateLogin(req.body);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, result.message)
     );
@@ -89,15 +89,15 @@ export const verifyLoginOTP = async (req, res, next) => {
     const service = new AdminService(req.tenantPrisma);
     const { sessionId } = req.params;
     const { otp } = req.body;
-    
+
     if (!sessionId || !otp) {
       return res.status(HttpStatus.BAD_REQUEST).json(
         ApiResponse.error('Session ID (in URL) and OTP (in body) are required')
       );
     }
-    
+
     const result = await service.verifyLoginOTP(sessionId, otp.trim());
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, 'Login successful')
     );
@@ -115,15 +115,15 @@ export const resendLoginOTP = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const { sessionId } = req.params;
-    
+
     if (!sessionId) {
       return res.status(HttpStatus.BAD_REQUEST).json(
         ApiResponse.error('Session ID is required in URL params')
       );
     }
-    
+
     const result = await service.resendLoginOTP(sessionId);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, result.message)
     );
@@ -142,17 +142,17 @@ export const resendAdminCredentials = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const { newPassword, confirmPassword } = req.body;
-    
+
     // Validate using the new validator
     const { validateNewPassword } = await import('./admin.validators.js');
     validateNewPassword({ newPassword, confirmPassword });
-    
+
     const result = await service.resendAdminCredentials(
       req.params.id,
       newPassword,
       req.user.id
     );
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, 'Credentials reset and sent via email')
     );
@@ -171,7 +171,7 @@ export const getAdminProfile = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getProfile(req.user.id, req);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -190,7 +190,7 @@ export const updateAdminProfile = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.updateProfile(req.user.id, req.body);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, 'Profile updated successfully')
     );
@@ -208,7 +208,7 @@ export const initiateProfileUpdate = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.initiateProfileUpdate(req.user.id, req.body);
-    
+
     // If OTP not required (non-SUPER_ADMIN), do direct update
     if (!result.requiresOTP) {
       const updateResult = await service.updateProfile(req.user.id, req.body);
@@ -216,7 +216,7 @@ export const initiateProfileUpdate = async (req, res, next) => {
         ApiResponse.success(updateResult, 'Profile updated successfully')
       );
     }
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, result.message)
     );
@@ -236,15 +236,15 @@ export const verifyProfileUpdate = async (req, res, next) => {
     const service = new AdminService(req.tenantPrisma);
     const { sessionId } = req.params;
     const { otp } = req.body;
-    
+
     if (!sessionId || !otp) {
       return res.status(HttpStatus.BAD_REQUEST).json(
         ApiResponse.error('Session ID (in URL) and OTP (in body) are required')
       );
     }
-    
+
     const result = await service.verifyProfileUpdateOTP(sessionId, otp.trim());
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, 'Profile updated successfully')
     );
@@ -261,7 +261,7 @@ export const updateAdminProfilePhoto = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.updateProfilePhoto(req.user.id, req.file);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, result.message)
     );
@@ -279,7 +279,7 @@ export const deleteAdminById = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.deleteAdmin(req.params.id, req.user.id, req.user.role);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, result.message)
     );
@@ -298,7 +298,7 @@ export const getAllEmployees = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getAllEmployees(req.user.hospitalId);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -315,7 +315,7 @@ export const getAllDoctors = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getAllDoctors(req.user.hospitalId);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -332,7 +332,7 @@ export const getEmployeeProfileByAdmin = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getEmployeeProfile(req.params.id, req.user.hospitalId);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -349,7 +349,7 @@ export const getDoctorProfileByAdmin = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getDoctorProfile(req.params.id, req.user.hospitalId);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -366,7 +366,7 @@ export const deleteEmployee = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.deleteEmployee(req.params.id, req.user.hospitalId);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, result.message)
     );
@@ -383,7 +383,7 @@ export const deleteDoctor = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.deleteDoctor(req.params.id, req.user.hospitalId);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, result.message)
     );
@@ -400,11 +400,11 @@ export const updateEmployeeSalary = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.updateEmployeeSalary(
-      req.params.id, 
-      req.body.salary, 
+      req.params.id,
+      req.body.salary,
       req.user.hospitalId
     );
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, 'Salary updated successfully')
     );
@@ -421,11 +421,11 @@ export const updateDoctorSalary = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.updateDoctorSalary(
-      req.params.id, 
-      req.body.salary, 
+      req.params.id,
+      req.body.salary,
       req.user.hospitalId
     );
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, 'Salary updated successfully')
     );
@@ -444,7 +444,7 @@ export const getDashboardSummary = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getDashboardSummary(req.user.hospitalId);
-    
+
     return res.status(HttpStatus.OK).json(result);
   } catch (error) {
     next(error);
@@ -459,7 +459,7 @@ export const getTodayAttendanceSummary = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getTodayAttendanceSummary(req.user.hospitalId);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -476,7 +476,7 @@ export const getPresentToday = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getPresentToday(req.user.hospitalId);
-    
+
     return res.status(HttpStatus.OK).json(result);
   } catch (error) {
     if (error.code === 'P2024') {
@@ -499,11 +499,11 @@ export const setDelegatedPermissions = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.setDelegatedPermissions(
-      req.params.id, 
-      req.body.permissions, 
+      req.params.id,
+      req.body.permissions,
       req.user
     );
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, result.message)
     );
@@ -520,11 +520,11 @@ export const getDelegatedPermissions = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getDelegatedPermissions(
-      req.params.id, 
-      req.user.hospitalId, 
+      req.params.id,
+      req.user.hospitalId,
       req.user.role
     );
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -543,7 +543,7 @@ export const getHospitalProfile = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getHospitalProfile(req.user.hospitalId, req);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -560,7 +560,7 @@ export const updateHospitalProfile = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.updateHospitalProfile(req.user.hospitalId, req.body);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, result.message)
     );
@@ -577,7 +577,7 @@ export const updateHospitalLogo = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.updateHospitalLogo(req.user.hospitalId, req.file);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, result.message)
     );
@@ -596,11 +596,11 @@ export const createAssignment = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.createAssignment(
-      req.body, 
-      req.user.id, 
+      req.body,
+      req.user.id,
       req.user.hospitalId
     );
-    
+
     return res.status(HttpStatus.CREATED).json(
       ApiResponse.success(result, result.message)
     );
@@ -617,11 +617,11 @@ export const getAssignmentsForUser = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getAssignmentsForUser(
-      req.user.id, 
-      req.user.role, 
+      req.user.id,
+      req.user.role,
       req.user.hospitalId
     );
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -640,7 +640,7 @@ export const getDefaultSchema = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = service.getDefaultSchema(req.params.role);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -657,11 +657,11 @@ export const initializeForm = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.initializeForm(
-      req.params.role, 
-      req.user.hospitalId, 
+      req.params.role,
+      req.user.hospitalId,
       req.user.id
     );
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -678,7 +678,7 @@ export const getFormTemplate = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getFormTemplate(req.params.role, req.user.hospitalId);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -695,7 +695,7 @@ export const getFormTemplateFields = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.getFormTemplateFields(req.params.role, req.user.hospitalId);
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result)
     );
@@ -713,11 +713,11 @@ export const updateFormTemplate = async (req, res, next) => {
   try {
     const service = new AdminService(req.tenantPrisma);
     const result = await service.updateFormTemplate(
-      req.params.role, 
-      req.user.hospitalId, 
+      req.params.role,
+      req.user.hospitalId,
       req.body.fields
     );
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, 'Form template updated successfully')
     );
@@ -739,7 +739,7 @@ export const updateFormField = async (req, res, next) => {
       req.user.hospitalId,
       req.body
     );
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, 'Field updated successfully')
     );
@@ -761,7 +761,7 @@ export const addFormField = async (req, res, next) => {
       req.user.hospitalId,
       req.body
     );
-    
+
     return res.status(HttpStatus.CREATED).json(
       ApiResponse.success(result, 'Field added successfully')
     );
@@ -782,9 +782,63 @@ export const deleteFormField = async (req, res, next) => {
       req.params.fieldId,
       req.user.hospitalId
     );
-    
+
     return res.status(HttpStatus.OK).json(
       ApiResponse.success(result, 'Field deleted successfully')
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== GEOFENCE SETTINGS ====================
+
+/**
+ * Get geofence settings
+ * GET /api/v1/admin/geofence-settings
+ */
+export const getGeofenceSettings = async (req, res, next) => {
+  try {
+    const service = new AdminService(req.tenantPrisma);
+    const result = await service.getGeofenceSettings(req.user.hospitalId);
+
+    return res.status(HttpStatus.OK).json(
+      ApiResponse.success(result)
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update geofence settings
+ * PUT /api/v1/admin/geofence-settings
+ * Body: { latitude, longitude, pinCode, geofenceRadiusMeters, geofenceEnabled }
+ */
+export const updateGeofenceSettings = async (req, res, next) => {
+  try {
+    const service = new AdminService(req.tenantPrisma);
+    const result = await service.updateGeofenceSettings(req.user.hospitalId, req.body);
+
+    return res.status(HttpStatus.OK).json(
+      ApiResponse.success(result, result.message)
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Lookup postal PIN code
+ * GET /api/v1/admin/pincode-lookup/:pincode
+ */
+export const lookupPinCode = async (req, res, next) => {
+  try {
+    const service = new AdminService(req.tenantPrisma);
+    const result = await service.lookupPinCode(req.params.pincode);
+
+    return res.status(HttpStatus.OK).json(
+      ApiResponse.success(result)
     );
   } catch (error) {
     next(error);
@@ -823,24 +877,8 @@ export default {
   updateFormTemplate,
   updateFormField,
   addFormField,
-  deleteFormField
+  deleteFormField,
+  getGeofenceSettings,
+  updateGeofenceSettings,
+  lookupPinCode
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

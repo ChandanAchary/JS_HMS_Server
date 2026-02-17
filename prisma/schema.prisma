@@ -73,6 +73,11 @@ model Hospital {
   latitude  Float  @default(0)
   longitude Float  @default(0)
 
+  // Geofence settings for attendance
+  pinCode              String  @default("")
+  geofenceRadiusMeters Int     @default(50)
+  geofenceEnabled      Boolean @default(false)
+
   // Hospital profile fields
   logo               String @default("") // Path to hospital logo
   registrationType   String @default("") // e.g., "Clinic", "Hospital", "Diagnostic Center"

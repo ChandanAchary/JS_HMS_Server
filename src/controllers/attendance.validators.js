@@ -50,22 +50,24 @@ export const formatHistoryItem = (attendance, sessions) => ({
 /**
  * Response DTO for check-in success
  */
-export const formatCheckInResponse = (attendance, session) => ({
+export const formatCheckInResponse = (attendance, session, distanceFromHospital = null) => ({
   message: 'Checked in',
   attendance: {
     id: attendance.id,
     date: attendance.date
   },
-  session: formatSession(session)
+  session: formatSession(session),
+  distanceFromHospital
 });
 
 /**
  * Response DTO for check-out success
  */
-export const formatCheckOutResponse = (attendanceId, session) => ({
+export const formatCheckOutResponse = (attendanceId, session, distanceFromHospital = null) => ({
   message: 'Checked out',
   attendanceId,
-  session: formatSession(session)
+  session: formatSession(session),
+  distanceFromHospital
 });
 
 /**
@@ -171,7 +173,7 @@ export const validateCheckOut = (data) => {
 export const parseLocationInput = (req) => {
   const latitudeRaw = req.body?.latitude ?? req.body?.lat ?? req.query?.latitude ?? req.query?.lat;
   const longitudeRaw = req.body?.longitude ?? req.body?.lng ?? req.query?.longitude ?? req.query?.lng;
-  
+
   return {
     latitude: latitudeRaw,
     longitude: longitudeRaw
