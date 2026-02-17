@@ -312,7 +312,30 @@ export class AdminService {
       throw new UnauthorizedError('Invalid credentials');
     }
 
-    // Generate OTP and session
+    // Check if OTP is required (every 7 days)
+    const now = new Date();
+    const lastOtpVerifiedAt = admin.lastOtpVerifiedAt ? new Date(admin.lastOtpVerifiedAt) : null;
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    if (lastOtpVerifiedAt && (now - lastOtpVerifiedAt) < SEVEN_DAYS_MS) {
+      // No OTP required, login directly
+      const permissions = getPermissionsForRole(admin.role || 'ADMIN');
+      const token = jwt.sign(
+        {
+          id: admin.id,
+          role: admin.role || 'ADMIN',
+          hospitalId: admin.hospitalId,
+          tenantId: admin.hospitalId,
+          hospitalName: admin.hospital?.hospitalName,
+          permissions
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '1d' }
+      );
+      logger.info(`[Admin] Login (no OTP needed) for ${admin.email}`);
+      return formatAdminLoginResponse(admin, token);
+    }
+
+    // OTP required
     const otp = this.generateOTP();
     const hashedOTP = this.hashOTP(otp);
     const sessionId = crypto.randomBytes(16).toString('hex');
@@ -390,12 +413,14 @@ export class AdminService {
       throw new NotFoundError('Admin not found');
     }
 
-    // Clear OTP from database
+
+    // Clear OTP from database and update lastOtpVerifiedAt
     await this.prisma.admin.update({
       where: { id: admin.id },
       data: {
         emailVerificationOTP: null,
-        emailVerificationOTPExpiry: null
+        emailVerificationOTPExpiry: null,
+        lastOtpVerifiedAt: new Date()
       }
     });
 

@@ -192,8 +192,12 @@ model Admin {
   passwordResetOTP       String?
   passwordResetOTPExpiry DateTime?
 
+
   // First login password change
   isPasswordChanged Boolean @default(false)
+
+  // Last time OTP was verified for login
+  lastOtpVerifiedAt DateTime?
 
   // Change-password (logged-in) OTP & pending new password
   changePasswordOTP       String?
