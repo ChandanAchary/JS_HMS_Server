@@ -57,6 +57,15 @@ export function createApp(prisma) {
   // Serve uploads folder so frontend can load images
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
+  // ===== ROOT ROUTE =====
+  // Show server status at /
+  app.get('/', (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: 'Server is running. Welcome to the Hospital Management System!'
+    });
+  });
+
   // ===== API ROUTES =====
   // Mount API routes directly under /api
   app.use('/api', initializeApiRoutes(prisma));
@@ -101,22 +110,3 @@ export function createApp(prisma) {
 }
 
 export default createApp;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
