@@ -25,9 +25,6 @@ export const API_ROUTES = {
     CHANGE_PASSWORD: `${BASE_URL}/auth/change-password`,
     GET_PROFILE: `${BASE_URL}/auth/me`,
     DEBUG: `${BASE_URL}/auth/debug`,
-
-    // Role-specific login (legacy)
-    ROLE_LOGIN: (role: string) => `${BASE_URL}/auth/${role}/login`,
   },
 
   // =========================
@@ -100,7 +97,7 @@ export const API_ROUTES = {
   // EMPLOYEE MANAGEMENT
   // =========================
   EMPLOYEE: {
-    LOGIN: (hospitalId: string) => `${BASE_URL}/employees/login/${hospitalId}`,
+    LOGIN: `${BASE_URL}/employees/login`,
     GET_PROFILE: `${BASE_URL}/employees/profile`,
     UPDATE_PROFILE: `${BASE_URL}/employees/profile`,
     UPDATE_PROFILE_PIC: `${BASE_URL}/employees/profile`,
@@ -120,7 +117,7 @@ export const API_ROUTES = {
   // DOCTOR MANAGEMENT
   // =========================
   DOCTOR: {
-    LOGIN: (hospitalId: string) => `${BASE_URL}/doctors/login/${hospitalId}`,
+    LOGIN: `${BASE_URL}/doctors/login`,
     GET_PROFILE: `${BASE_URL}/doctors/profile`,
     UPDATE_PROFILE: `${BASE_URL}/doctors/profile`,
     UPDATE_PROFILE_PIC: `${BASE_URL}/doctors/profile`,
@@ -174,33 +171,49 @@ export const API_ROUTES = {
   OPD: {
     LOGIN: `${BASE_URL}/opd/login`,
 
-    // Dashboard
-    GET_DASHBOARD: `${BASE_URL}/opd/dashboard`,
-    GET_QUEUE_DISPLAY: `${BASE_URL}/opd/queue-display`,
+    // Dashboard & Queue (opd-dashboard.routes.js)
+    GET_DASHBOARD: `${BASE_URL}/opd/opdDashboard`,
+    GET_STATISTICS: `${BASE_URL}/opd/statistics`,
+    GET_NEXT_PATIENT: `${BASE_URL}/opd/next-patient`,
+    GET_PATIENT_DETAILS: (visitId: string) => `${BASE_URL}/opd/patient/${visitId}`,
+    CALL_PATIENT: (queueId: string) => `${BASE_URL}/opd/call-patient/${queueId}`,
+    START_SERVING: (queueId: string) => `${BASE_URL}/opd/start-serving/${queueId}`,
+    COMPLETE_SERVICE: (queueId: string) => `${BASE_URL}/opd/complete-service/${queueId}`,
+    SKIP_PATIENT: (queueId: string) => `${BASE_URL}/opd/skip-patient/${queueId}`,
 
-    // Vitals
-    RECORD_VITALS: `${BASE_URL}/opd/vitals/record`,
-    GET_VITALS: (patientId: string) => `${BASE_URL}/opd/vitals/${patientId}`,
+    // Vitals (mounted at /api/opd/vitals — vitals.routes.js)
+    RECORD_VITALS: (visitId: string) => `${BASE_URL}/opd/vitals/${visitId}/vitals`,
+    GET_VITALS: (visitId: string) => `${BASE_URL}/opd/vitals/${visitId}/vitals`,
+    GET_VITALS_STATUS: (visitId: string) => `${BASE_URL}/opd/vitals/${visitId}/vitals/status`,
+    GET_VITALS_COMPARISON: (visitId: string) => `${BASE_URL}/opd/vitals/${visitId}/vitals/comparison`,
+    UPDATE_VITALS: (visitId: string) => `${BASE_URL}/opd/vitals/${visitId}/vitals`,
+    GET_VITALS_HISTORY: (patientId: string) => `${BASE_URL}/opd/vitals/history/${patientId}`,
 
-    // Consultation
-    CREATE_CONSULTATION: `${BASE_URL}/opd/consultation/create`,
-    GET_CONSULTATION: (consultationId: string) => `${BASE_URL}/opd/consultation/${consultationId}`,
-    UPDATE_CONSULTATION: (consultationId: string) => `${BASE_URL}/opd/consultation/${consultationId}`,
+    // Consultation Notes (opd-consultation.routes.js)
+    ADD_CONSULTATION_NOTE: (visitId: string) => `${BASE_URL}/opd/consultation/${visitId}/note`,
+    GET_CONSULTATION_NOTE: (visitId: string) => `${BASE_URL}/opd/consultation/${visitId}/note`,
+    UPDATE_CONSULTATION_NOTE: (noteId: string) => `${BASE_URL}/opd/consultation/note/${noteId}`,
 
     // Prescriptions
-    CREATE_PRESCRIPTION: `${BASE_URL}/opd/prescription/create`,
-    GET_PRESCRIPTIONS: (consultationId: string) => `${BASE_URL}/opd/prescriptions/${consultationId}`,
+    CREATE_PRESCRIPTION: (visitId: string) => `${BASE_URL}/opd/prescription/${visitId}`,
+    GET_PRESCRIPTIONS_BY_VISIT: (visitId: string) => `${BASE_URL}/opd/prescription/visit/${visitId}`,
+    GET_PRESCRIPTION: (prescriptionId: string) => `${BASE_URL}/opd/prescription/${prescriptionId}`,
+    UPDATE_PRESCRIPTION_STATUS: (prescriptionId: string) => `${BASE_URL}/opd/prescription/${prescriptionId}/status`,
 
     // Test Orders
-    CREATE_TEST_ORDER: `${BASE_URL}/opd/test-order/create`,
-    GET_TEST_ORDERS: (patientId: string) => `${BASE_URL}/opd/test-orders/${patientId}`,
+    CREATE_TEST_ORDER: (visitId: string) => `${BASE_URL}/opd/test-order/${visitId}`,
+    GET_TEST_ORDERS_BY_VISIT: (visitId: string) => `${BASE_URL}/opd/test-order/visit/${visitId}`,
+    UPDATE_TEST_ORDER_STATUS: (orderId: string) => `${BASE_URL}/opd/test-order/${orderId}/status`,
 
     // Patient History
-    GET_PATIENT_HISTORY: (patientId: string) => `${BASE_URL}/opd/patient-history/${patientId}`,
+    GET_PATIENT_HISTORY: (patientId: string) => `${BASE_URL}/opd/patient/${patientId}/history`,
+    GET_COMPLETE_VISIT: (visitId: string) => `${BASE_URL}/opd/visit/${visitId}/complete`,
   },
 
   // =========================
   // IPD (Inpatient Department)
+  // Note: Routes are factory-based (createIPDRoutes) and not yet mounted
+  // in the main api router. Paths shown below match the factory definitions.
   // =========================
   IPD: {
     // Admissions
@@ -437,95 +450,186 @@ export const API_ROUTES = {
   // ATTENDANCE
   // =========================
   ATTENDANCE: {
-    MARK_ATTENDANCE: `${BASE_URL}/attendance/mark`,
-    GET_ATTENDANCE: `${BASE_URL}/attendance`,
-    GET_EMPLOYEE_ATTENDANCE: (employeeId: string) => `${BASE_URL}/attendance/employee/${employeeId}`,
-    GET_DOCTOR_ATTENDANCE: (doctorId: string) => `${BASE_URL}/attendance/doctor/${doctorId}`,
+    // Self routes (authenticated user's own attendance)
+    CHECK_IN: `${BASE_URL}/attendance/check-in`,
+    CHECK_OUT: `${BASE_URL}/attendance/check-out`,
+    GET_TODAY: `${BASE_URL}/attendance/today`,
+    GET_MY_HISTORY: `${BASE_URL}/attendance/my-history`,
+
+    // Admin routes
+    GET_ADMIN_SUMMARY: `${BASE_URL}/attendance/admin/summary`,
+    GET_USER_DETAILS: (userId: string) => `${BASE_URL}/attendance/admin/${userId}`,
   },
 
   // =========================
   // DEPARTMENT MANAGEMENT
   // =========================
   DEPARTMENT: {
+    // Public routes
     LIST_ALL: `${BASE_URL}/departments`,
-    CREATE: `${BASE_URL}/departments`,
-    GET_BY_ID: (id: string) => `${BASE_URL}/departments/${id}`,
-    UPDATE: (id: string) => `${BASE_URL}/departments/${id}`,
-    DELETE: (id: string) => `${BASE_URL}/departments/${id}`,
+    GET_BY_CODE: (code: string) => `${BASE_URL}/departments/${code}`,
+
+    // Diagnostic department
+    DIAGNOSTICS_LOGIN: `${BASE_URL}/departments/diagnostics/login`,
+    GET_DIAGNOSTIC_CATEGORIES: `${BASE_URL}/departments/diagnostics/categories`,
+    GET_DIAGNOSTIC_WORKLIST: `${BASE_URL}/departments/diagnostics/worklist`,
+    GET_DIAGNOSTIC_DASHBOARD_STATS: `${BASE_URL}/departments/diagnostics/dashboard-stats`,
   },
 
   // =========================
   // PASSWORD MANAGEMENT
   // =========================
   PASSWORD: {
-    REQUEST_RESET: `${BASE_URL}/password/request-reset`,
-    VERIFY_OTP: `${BASE_URL}/password/verify-otp`,
-    RESET_PASSWORD: `${BASE_URL}/password/reset`,
+    // Forgot password flow (public)
+    FORGOT: `${BASE_URL}/password/forgot`,
+    RESET: `${BASE_URL}/password/reset`,
+
+    // First login password change (protected)
+    FIRST_LOGIN_SEND_OTP: `${BASE_URL}/password/first-login/send-otp`,
+    FIRST_LOGIN_CHANGE: `${BASE_URL}/password/first-login/change`,
+
+    // Regular password change with OTP (protected)
+    CHANGE_SEND_OTP: `${BASE_URL}/password/change/send-otp`,
+    CHANGE: `${BASE_URL}/password/change`,
   },
 
   // =========================
   // SETUP & ONBOARDING
   // =========================
   SETUP: {
-    INITIALIZE: `${BASE_URL}/setup/initialize`,
+    // Phase 1: Admin registration (public)
     GET_STATUS: `${BASE_URL}/setup/status`,
+    REGISTER_ADMIN: `${BASE_URL}/setup/register-admin`,
+    VERIFY_ADMIN_OTP: (sessionId: string) => `${BASE_URL}/setup/verify-admin-otp/${sessionId}`,
+
+    // Phase 3: Hospital configuration (protected - admin only)
+    GET_HOSPITAL_SETUP_STATUS: `${BASE_URL}/setup/hospital-setup-status`,
+    CONFIGURE_HOSPITAL: `${BASE_URL}/setup/configure-hospital`,
+    GET_ONBOARDING_STATUS: `${BASE_URL}/setup/onboarding-status`,
   },
 
   ONBOARDING: {
-    GET_CURRENT_STEP: `${BASE_URL}/onboarding/current-step`,
-    COMPLETE_STEP: (step: string) => `${BASE_URL}/onboarding/complete/${step}`,
-    GET_ONBOARDING_DATA: `${BASE_URL}/onboarding/data`,
+    // Public routes
+    LIST_PUBLIC_HOSPITALS: `${BASE_URL}/onboarding/public/hospitals`,
+    SUBMIT_JOIN_REQUEST: `${BASE_URL}/onboarding/public/join-request`,
+    SUBMIT_JOIN_APPLICATION: `${BASE_URL}/onboarding/public/join-request/submit-form`,
+    GET_APPLICATION_STATUS: `${BASE_URL}/onboarding/public/join-requests/status`,
+
+    // Token-based registration
+    VALIDATE_REGISTRATION_TOKEN: (role: string, token: string) => `${BASE_URL}/onboarding/register/${role}/${token}/validate`,
+    REGISTER_DOCTOR: (token: string) => `${BASE_URL}/onboarding/register/doctor/${token}`,
+    REGISTER_EMPLOYEE: (token: string) => `${BASE_URL}/onboarding/register/employee/${token}`,
+
+    // Email verification
+    SEND_OTP: (role: string, id: string) => `${BASE_URL}/onboarding/send-otp/${role}/${id}`,
+    VERIFY_OTP: (role: string, id: string) => `${BASE_URL}/onboarding/verify-otp/${role}/${id}`,
+
+    // Admin routes (protected)
+    GET_JOIN_REQUESTS: `${BASE_URL}/onboarding/admin/join-requests`,
+    GET_JOIN_REQUEST: (id: string) => `${BASE_URL}/onboarding/admin/join-requests/${id}`,
+    UPDATE_JOIN_REQUEST: (id: string) => `${BASE_URL}/onboarding/admin/join-requests/${id}`,
+    SEND_INVITE_TO_REQUEST: (id: string) => `${BASE_URL}/onboarding/admin/join-requests/${id}/send-invite`,
+    APPROVE_JOIN_REQUEST: (id: string) => `${BASE_URL}/onboarding/admin/join-requests/${id}/approve`,
+    REJECT_JOIN_REQUEST: (id: string) => `${BASE_URL}/onboarding/admin/join-requests/${id}/reject`,
+    GET_VERIFICATIONS_QUEUE: `${BASE_URL}/onboarding/admin/verifications`,
+    APPROVE_VERIFICATION: (type: string, id: string) => `${BASE_URL}/onboarding/admin/verify/${type}/${id}/approve`,
+    REJECT_VERIFICATION: (type: string, id: string) => `${BASE_URL}/onboarding/admin/verify/${type}/${id}/reject`,
   },
 
   // =========================
   // PUBLIC REGISTRATION
   // =========================
   PUBLIC_REGISTRATION: {
-    REGISTER: `${BASE_URL}/public/register`,
-    VERIFY_EMAIL: `${BASE_URL}/public/verify-email`,
-    RESEND_VERIFICATION: `${BASE_URL}/public/resend-verification`,
+    GET_REGISTRATION_FORM: (role: string) => `${BASE_URL}/public/join/registration-form/${role}`,
+    APPLY: (role: string) => `${BASE_URL}/public/join/apply/${role}`,
+    CHECK_APPLICATION_STATUS: `${BASE_URL}/public/join/application-status`,
   },
 
   // =========================
   // DIAGNOSTIC REPORT TEMPLATES
+  // Mounted at: /api/diagnostics/templates (via diagnostics router)
   // =========================
   TEMPLATE: {
-    LIST_ALL: `${BASE_URL}/templates`,
-    GET_BY_ID: (id: string) => `${BASE_URL}/templates/${id}`,
-    CREATE: `${BASE_URL}/templates`,
-    UPDATE: (id: string) => `${BASE_URL}/templates/${id}`,
-    DELETE: (id: string) => `${BASE_URL}/templates/${id}`,
-    DUPLICATE: (id: string) => `${BASE_URL}/templates/${id}/duplicate`,
+    // Read routes
+    LIST_ALL: `${BASE_URL}/diagnostics/templates`,
+    GET_GROUPED: `${BASE_URL}/diagnostics/templates/grouped`,
+    GET_FOR_TEST: `${BASE_URL}/diagnostics/templates/for-test`,
+    GET_ENTRY_FORM: `${BASE_URL}/diagnostics/templates/entry-form`,
+    GET_PRINT_CONFIG: `${BASE_URL}/diagnostics/templates/print-config`,
+    GET_ENTRY_FIELDS: (templateCode: string) => `${BASE_URL}/diagnostics/templates/entry-fields/${templateCode}`,
+    GET_REFERENCE_RANGES: (templateCode: string) => `${BASE_URL}/diagnostics/templates/reference-ranges/${templateCode}`,
+    GET_BY_ID: (templateId: string) => `${BASE_URL}/diagnostics/templates/${templateId}`,
+
+    // Create routes
+    CREATE: `${BASE_URL}/diagnostics/templates`,
+    CLONE: (templateId: string) => `${BASE_URL}/diagnostics/templates/${templateId}/clone`,
+
+    // Update routes
+    UPDATE: (templateId: string) => `${BASE_URL}/diagnostics/templates/${templateId}`,
+    UPDATE_SECTIONS: (templateId: string) => `${BASE_URL}/diagnostics/templates/${templateId}/sections`,
+    UPDATE_ENTRY_FIELDS: (templateId: string) => `${BASE_URL}/diagnostics/templates/${templateId}/entry-fields`,
+    UPDATE_STYLING: (templateId: string) => `${BASE_URL}/diagnostics/templates/${templateId}/styling`,
+    SET_AS_DEFAULT: (templateId: string) => `${BASE_URL}/diagnostics/templates/${templateId}/set-default`,
+    CREATE_VERSION: (templateId: string) => `${BASE_URL}/diagnostics/templates/${templateId}/version`,
+
+    // Delete / deactivate routes
+    DEACTIVATE: (templateId: string) => `${BASE_URL}/diagnostics/templates/${templateId}/deactivate`,
+    DELETE: (templateId: string) => `${BASE_URL}/diagnostics/templates/${templateId}`,
+
+    // Admin / initialization
+    SEED: `${BASE_URL}/diagnostics/templates/seed`,
+    INITIALIZE: `${BASE_URL}/diagnostics/templates/initialize`,
   },
 
   // =========================
-  // WORKBOARD (Result Entry Workflow)
+  // WORKBOARD (Diagnostics Result Entry Workflow)
+  // Mounted at: /api/diagnostics/workboard (via diagnostics router)
   // =========================
   WORKBOARD: {
-    GET_PENDING_ENTRIES: `${BASE_URL}/workboard/pending`,
-    START_ENTRY: (orderId: string) => `${BASE_URL}/workboard/${orderId}/start`,
-    SUBMIT_ENTRY: (orderId: string) => `${BASE_URL}/workboard/${orderId}/submit`,
-    GET_ENTRY_STATUS: (orderId: string) => `${BASE_URL}/workboard/${orderId}/status`,
+    GET_WORKLIST: (category: string) => `${BASE_URL}/diagnostics/workboard/worklist/${category}`,
+    GET_ENTRY_FORM: (resultId: string) => `${BASE_URL}/diagnostics/workboard/entry-form/${resultId}`,
+
+    // Result entry
+    SAVE_RESULT: (resultId: string) => `${BASE_URL}/diagnostics/workboard/results/${resultId}`,
+    SUBMIT_FOR_REVIEW: (resultId: string) => `${BASE_URL}/diagnostics/workboard/results/${resultId}/submit`,
+
+    // QC workflow
+    QC_APPROVE: (resultId: string) => `${BASE_URL}/diagnostics/workboard/results/${resultId}/qc-approve`,
+    QC_REJECT: (resultId: string) => `${BASE_URL}/diagnostics/workboard/results/${resultId}/qc-reject`,
+
+    // Review & release
+    REVIEW_APPROVE: (resultId: string) => `${BASE_URL}/diagnostics/workboard/results/${resultId}/review-approve`,
+    RELEASE: (resultId: string) => `${BASE_URL}/diagnostics/workboard/results/${resultId}/release`,
+    AMEND: (resultId: string) => `${BASE_URL}/diagnostics/workboard/results/${resultId}/amend`,
   },
 
   // =========================
   // IPD ADMISSION QUEUE
+  // Note: Routes are factory-based (createAdmissionQueueRouter) and not yet
+  // mounted in the main api router. Paths shown are from the factory definition.
   // =========================
   IPD_QUEUE: {
-    LIST_PENDING: `${BASE_URL}/ipd-admission-queue/pending`,
-    GET_QUEUE_ENTRY: (id: string) => `${BASE_URL}/ipd-admission-queue/${id}`,
-    ADMIT_FROM_QUEUE: (id: string) => `${BASE_URL}/ipd-admission-queue/${id}/admit`,
-    CANCEL_QUEUE_ENTRY: (id: string) => `${BASE_URL}/ipd-admission-queue/${id}/cancel`,
+    CREATE_REQUEST: `${BASE_URL}/ipd/queue/request`,
+    LIST_PENDING: `${BASE_URL}/ipd/queue/pending`,
+    GET_PATIENT_REQUESTS: (patientId: string) => `${BASE_URL}/ipd/queue/patient/${patientId}`,
+    GET_REQUEST: (requestId: string) => `${BASE_URL}/ipd/queue/request/${requestId}`,
+    APPROVE_REQUEST: (requestId: string) => `${BASE_URL}/ipd/queue/request/${requestId}/approve`,
+    REJECT_REQUEST: (requestId: string) => `${BASE_URL}/ipd/queue/request/${requestId}/reject`,
+    GET_STATS: `${BASE_URL}/ipd/queue/stats`,
   },
 
   // =========================
   // VITAL SIGNS
+  // Note: Vitals are served via the OPD module at /api/opd/vitals/
+  // Use OPD.RECORD_VITALS, OPD.GET_VITALS, OPD.GET_VITALS_HISTORY etc.
   // =========================
   VITALS: {
-    RECORD: `${BASE_URL}/vitals/record`,
-    GET_LATEST: (patientId: string) => `${BASE_URL}/vitals/patient/${patientId}/latest`,
-    GET_HISTORY: (patientId: string) => `${BASE_URL}/vitals/patient/${patientId}/history`,
-    GET_TREND: (patientId: string) => `${BASE_URL}/vitals/patient/${patientId}/trend`,
+    RECORD: (visitId: string) => `${BASE_URL}/opd/vitals/${visitId}/vitals`,
+    GET_BY_VISIT: (visitId: string) => `${BASE_URL}/opd/vitals/${visitId}/vitals`,
+    GET_STATUS: (visitId: string) => `${BASE_URL}/opd/vitals/${visitId}/vitals/status`,
+    GET_COMPARISON: (visitId: string) => `${BASE_URL}/opd/vitals/${visitId}/vitals/comparison`,
+    UPDATE: (visitId: string) => `${BASE_URL}/opd/vitals/${visitId}/vitals`,
+    GET_HISTORY: (patientId: string) => `${BASE_URL}/opd/vitals/history/${patientId}`,
   },
 
 } as const;

@@ -17,9 +17,9 @@ const router = express.Router();
  * ===============================
  */
 
-// Login doctor - REQUIRES hospitalId in path
-// POST /api/v1/doctors/login/:hospitalId
-router.post('/login/:hospitalId', doctorController.login);
+// Login doctor - single-tenant, no hospitalId needed
+// POST /api/doctors/login
+router.post('/login', doctorController.login);
 
 /**
  * ===============================

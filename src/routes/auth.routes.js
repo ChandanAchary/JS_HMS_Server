@@ -13,7 +13,7 @@ export function createAuthRoutes(prisma) {
 
   // Root endpoint - returns auth module info
   router.get('/', (req, res) => {
-    res.json({ module: 'auth', status: 'active', endpoints: ['POST /login', 'POST /register', 'POST /verify', 'GET /me', 'POST /refresh', 'POST /change-password'] });
+    res.json({ module: 'auth', status: 'active', endpoints: ['POST /login', 'POST /register', 'POST /verify', 'GET /me', 'POST /refresh', 'POST /change-password', 'GET /debug'] });
   });
 
   /**
@@ -26,17 +26,7 @@ export function createAuthRoutes(prisma) {
    * POST /api/auth/login
    */
   router.post('/login', (req, res, next) => controller.unifiedLogin(req, res, next));
-  
-  /**
-   * Role-specific login endpoints (legacy, kept for compatibility)
-   * Role is passed in URL path, NOT in request body
-   * POST /api/auth/admin/login
-   * POST /api/auth/doctor/login
-   * POST /api/auth/employee/login
-   * POST /api/auth/patient/login
-   */
-  router.post('/:role/login', (req, res, next) => controller.login(req, res, next));
-  
+
   router.post('/register', (req, res, next) => controller.register(req, res, next));
   router.post('/verify', (req, res, next) => controller.verifyToken(req, res, next));
 

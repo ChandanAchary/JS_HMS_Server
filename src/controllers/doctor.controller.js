@@ -55,9 +55,9 @@ export const register = async (req, res, next) => {
 export const login = async (req, res, next) => {
   try {
     const { emailOrPhone, password } = req.body;
-    const hospitalId = req.params.hospitalId || req.hospitalId;
+    const hospitalId = req.hospitalId;
 
-    validateLogin({ emailOrPhone, password, hospitalId });
+    validateLogin({ emailOrPhone, password });
 
     const service = getService(req);
     const result = await service.login(emailOrPhone, password, hospitalId);

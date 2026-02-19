@@ -211,10 +211,6 @@ export const validateLogin = (data) => {
     errors.push('Password is required');
   }
 
-  if (!data.hospitalId) {
-    errors.push('Hospital ID is required');
-  }
-
   if (errors.length > 0) {
     throw new ValidationError(errors.join('. '));
   }
