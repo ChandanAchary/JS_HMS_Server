@@ -11,6 +11,11 @@ import upload, { uploadToCloudinary } from '../middlewares/upload.middleware.js'
 
 const router = express.Router();
 
+// Root endpoint - returns attendance module info
+router.get('/', (req, res) => {
+  res.json({ module: 'attendance', status: 'active', endpoints: ['POST /check-in', 'POST /check-out', 'GET /today', 'GET /my-history', 'GET /admin/summary'] });
+});
+
 /**
  * ===============================
  * USER ROUTES (SELF)

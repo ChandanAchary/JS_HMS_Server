@@ -34,6 +34,11 @@ import { reportRoutes } from '../routes/reports.routes.js';
 export function initializeApiRoutes(prisma) {
   const router = express.Router();
 
+  // Root API endpoint - returns API info
+  router.get('/', (req, res) => {
+    res.json(getApiInfo());
+  });
+
   // Health check
   router.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

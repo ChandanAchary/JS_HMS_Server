@@ -61,13 +61,6 @@ export function createApp(prisma) {
   // Mount API routes directly under /api
   app.use('/api', initializeApiRoutes(prisma));
 
-  // ===== ROOT ROUTE =====
-  // Keep root friendly for browsers / service checks by redirecting to the API base.
-  // Render (and other hosts) often hit `/` for the primary URL — return a helpful redirect.
-  app.get('/', (req, res) => {
-    return res.redirect('/api');
-  });
-
   // ===== SWAGGER DOCUMENTATION =====
   // API documentation available at /api-docs
   // JSON spec available at /api-spec.json

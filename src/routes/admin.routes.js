@@ -36,6 +36,11 @@ import upload, { uploadToCloudinary } from '../middlewares/upload.middleware.js'
 
 const router = Router();
 
+// Root endpoint - returns admin module info
+router.get('/', (req, res) => {
+  res.json({ module: 'admin', status: 'active', endpoints: ['POST /auth/login', 'GET /profile', 'PUT /profile', 'POST /create-admin', 'GET /dashboard-summary'] });
+});
+
 // ==================== AUTH (Public - OTP Verified) ====================
 // Step 1: Verify password, send OTP to email
 router.post('/auth/login', adminController.loginAdmin);

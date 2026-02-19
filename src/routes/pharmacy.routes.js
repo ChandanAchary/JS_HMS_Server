@@ -11,6 +11,11 @@ import * as validators from '../controllers/pharmacy.validators.js';
 
 const router = express.Router();
 
+// Root endpoint - returns pharmacy module info
+router.get('/', (req, res) => {
+  res.json({ module: 'pharmacy', status: 'active', endpoints: ['GET /drugs', 'POST /drugs', 'GET /inventory', 'POST /dispense', 'GET /transactions'] });
+});
+
 // ============== DRUG MANAGEMENT ==============
 // Get all drugs (with filters)
 router.get('/drugs', authenticateToken, authorizePermission('MANAGE_BILLING'), controller.getDrugs);

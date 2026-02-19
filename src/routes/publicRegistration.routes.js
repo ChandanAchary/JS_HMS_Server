@@ -15,6 +15,11 @@ import {
 
 const router = Router();
 
+// Root endpoint - returns publicRegistration module info
+router.get('/', (req, res) => {
+  res.json({ module: 'publicRegistration', status: 'active', endpoints: ['GET /join/registration-form/:role', 'POST /join/apply/:role', 'GET /join/application-status'] });
+});
+
 /**
  * Registration Form Routes
  */

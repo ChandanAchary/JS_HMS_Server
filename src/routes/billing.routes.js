@@ -9,6 +9,11 @@ import { protect } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
+// Root endpoint - returns billing module info
+router.get('/', (req, res) => {
+  res.json({ module: 'billing', status: 'active', endpoints: ['POST /login', 'GET /catalog', 'POST /patients', 'GET /patients/search', 'POST /patients/:patientId/bills'] });
+});
+
 // Public route - billing login
 router.post('/login', billingController.billingLogin);
 

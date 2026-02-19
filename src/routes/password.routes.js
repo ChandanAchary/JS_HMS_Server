@@ -16,6 +16,11 @@ export function createPasswordRoutes(prisma) {
   const router = express.Router();
   const controller = new PasswordController(prisma);
 
+  // Root endpoint - returns password module info
+  router.get('/', (req, res) => {
+    res.json({ module: 'password', status: 'active', endpoints: ['POST /forgot', 'POST /reset', 'POST /first-login/send-otp', 'POST /first-login/change', 'POST /change/send-otp', 'POST /change'] });
+  });
+
   // ============== FORGOT PASSWORD FLOW (PUBLIC) ==============
   
   /**

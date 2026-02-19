@@ -11,6 +11,11 @@ import upload, { uploadToCloudinary } from '../middlewares/upload.middleware.js'
 
 const router = Router();
 
+// Root endpoint - returns onboarding module info
+router.get('/', (req, res) => {
+  res.json({ module: 'onboarding', status: 'active', endpoints: ['GET /public/hospitals', 'POST /public/join-request', 'GET /register/:role/:token/validate', 'GET /admin/join-requests'] });
+});
+
 // ==================== PUBLIC ROUTES ====================
 
 // Public hospital listing

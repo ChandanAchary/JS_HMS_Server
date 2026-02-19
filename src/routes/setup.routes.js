@@ -33,6 +33,11 @@ import { authorize } from '../middlewares/rbac.middleware.js';
 
 const router = Router();
 
+// Root endpoint - returns setup module info
+router.get('/', (req, res) => {
+  res.json({ module: 'setup', status: 'active', endpoints: ['GET /status', 'POST /register-admin', 'POST /verify-admin-otp/:sessionId', 'GET /hospital-setup-status'] });
+});
+
 // ==================== PHASE 1: ADMIN REGISTRATION (PUBLIC) ====================
 
 /**

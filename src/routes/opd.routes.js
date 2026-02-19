@@ -14,6 +14,11 @@ const router = express.Router();
 const prisma = getPrisma();
 const loginController = new OpdLoginController(prisma);
 
+// Root endpoint - returns OPD module info
+router.get('/', (req, res) => {
+  res.json({ module: 'opd', status: 'active', endpoints: ['POST /login', 'GET /queue', 'POST /vitals', 'GET /consultation-notes'] });
+});
+
 /**
  * @route   POST /api/opd/login
  * @desc    OPD Staff Login - Email/Phone + Password

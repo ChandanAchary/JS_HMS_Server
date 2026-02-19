@@ -11,6 +11,11 @@ export function createAuthRoutes(prisma) {
   const router = express.Router();
   const controller = new AuthController(prisma);
 
+  // Root endpoint - returns auth module info
+  router.get('/', (req, res) => {
+    res.json({ module: 'auth', status: 'active', endpoints: ['POST /login', 'POST /register', 'POST /verify', 'GET /me', 'POST /refresh', 'POST /change-password'] });
+  });
+
   /**
    * Public routes (no authentication required)
    */

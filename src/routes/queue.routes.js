@@ -9,6 +9,11 @@ import { protect } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
+// Root endpoint - no auth required for module info
+router.get('/', (req, res) => {
+  res.json({ module: 'queue', status: 'active', endpoints: ['GET /service-queues', 'POST /service-queues', 'POST /service-queues/:id/toggle', 'GET /service-queues/:id/display'] });
+});
+
 // Apply authentication to all queue routes
 router.use(protect);
 

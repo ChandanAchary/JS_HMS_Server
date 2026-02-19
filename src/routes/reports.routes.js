@@ -10,6 +10,11 @@ import { authorizePermission } from '../middlewares/rbac.middleware.js';
 
 const router = express.Router();
 
+// Root endpoint - returns reports module info
+router.get('/', (req, res) => {
+  res.json({ module: 'reports', status: 'active', endpoints: ['GET /patient/visit-statistics', 'GET /clinical/opd-analysis', 'GET /financial/revenue', 'GET /staff/attendance-summary'] });
+});
+
 // ============== PATIENT REPORTS ==============
 // Patient visit statistics
 router.get('/patient/visit-statistics', authenticateToken, authorizePermission('VIEW_REPORTS'), controller.getPatientVisitStats);

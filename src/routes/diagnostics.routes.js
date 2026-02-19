@@ -11,6 +11,11 @@ import workboardRoutes from './workboard.routes.js';
 
 const router = Router();
 
+// Root endpoint - no auth required for module info
+router.get('/', (req, res) => {
+  res.json({ module: 'diagnostics', status: 'active', endpoints: ['GET /tests', 'POST /orders', 'GET /orders', 'POST /collection/collect', 'POST /results/enter'] });
+});
+
 // All routes require authentication
 router.use(protect);
 
